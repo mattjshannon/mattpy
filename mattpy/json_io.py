@@ -14,6 +14,15 @@ from ast import literal_eval
 # from ipdb import set_trace as st
 
 
+def ensure_dir(path):
+    """Ensure the string is a directory, with a slash as its last
+        character."""
+    if path != '':
+        if path[-1] != '/':
+            path += '/'
+    return path
+
+
 def verify_dict_equality(dict1, dict2):
     """Ensure that the dictionary is unchnged after JSON write.
 
@@ -73,11 +82,11 @@ def parse_one_spectrum_file(fname):
     return spec_dict
 
 
-def convert_txt_to_dict(fdir, search_str='spectra*.txt'):
+def convert_txt_to_dict(file_dir, search_str='spectra*.txt'):
     """Import all spectra*.txt files, combine them into a dictionary.
 
     Args:
-        fdir (str): location of the PAHdb spectra.
+        file_dir (str): location of the PAHdb spectra.
 
     Note:
         Utilizes pandas DataFrame for reading.
@@ -87,7 +96,7 @@ def convert_txt_to_dict(fdir, search_str='spectra*.txt'):
 
     # Data to be combined.
     try:
-        glob_files = glob.glob(fdir + search_str)
+        glob_files = glob.glob(ensure_dir(file_dir) + search_str)
     except IOError as error:
         print(error)
 
@@ -165,23 +174,31 @@ def read_dict_from_disk(fname):
     return the_dict
 
 
-def dump_all_to_json(filedir, search_str='spectra*.txt',
+def dump_all_to_json(file_dir, search_str='spectra*.txt',
                      json_file='spectra_dict.json',
+                     json_dir=None,
                      verify=True):
     """Shorthand for converting all .txt PAHdb files to JSON.
 
     Args:
-        filedir (str): Directory containg 'spectra*.txt'.
+        file_dir (str): Directory containg 'spectra*.txt'.
         search_str (str): Glob search string for files to include.
         json_fname (str): JSON filename.
+        json_dir (str): Desired JSON output directory. If None,
+            will default to filedir.
 
     Note:
         Places resulting JSON files in the same directory as the .txt
             PAHdb files.
     """
 
-    mydict = convert_txt_to_dict(filedir, search_str)
-    json_path = filedir + json_file
+    file_dir = ensure_dir(file_dir)
+    mydict = convert_txt_to_dict(file_dir, search_str)
+
+    if json_dir:
+        json_path = ensure_dir(json_dir) + json_file
+    else:
+        json_path = ensure_dir(file_dir) + json_file
 
     # Try writing it to disk.
     write_dict_to_disk(json_path, mydict)

@@ -27,7 +27,7 @@ def test_verify_dict_equality():
 
 def test_parse_one_spectrum_file():
     """Test that a single PAHdb spectrum can be parsed."""
-    mock_fname = 'mattpy/tests/data/spectra_beta_2.5_ionfrac_0.45.txt'
+    mock_fname = 'mattpy/tests/data/spectra/spectra_beta_2.5_ionfrac_0.45.txt'
     dict1 = json_io.parse_one_spectrum_file(mock_fname)
     assert dict1['beta'] == 2.5
     assert dict1['ionfrac'] == 0.45
@@ -37,7 +37,7 @@ def test_parse_one_spectrum_file():
 def test_convert_txt_to_dict():
     """Test that spectra can be read in and returned as a dict
         (with tuple keys)."""
-    fdir = 'mattpy/tests/data/'
+    fdir = 'mattpy/tests/data/spectra/'
     dict1 = json_io.convert_txt_to_dict(fdir, search_str='spectra*.txt')
     assert list(dict1.keys()) == [(2.5, 0.45), (3.0, 0.05)]
 
@@ -49,7 +49,7 @@ def test_write_dict_to_disk():
     """Test that a dict (with tuple keys) can be written to disk
         as JSON."""
     dict1 = {(0.5, 0.5): [1, 2, 3, 4, 5]}
-    fname = 'mattpy/tests/data/test_write.json'
+    fname = 'mattpy/tests/data/json_test_folder/test_write.json'
     json_io.write_dict_to_disk(fname, dict1)
     assert os.path.isfile(fname)
 
@@ -57,7 +57,7 @@ def test_write_dict_to_disk():
 def test_read_dict_from_disk():
     """Test that the JSON (tuple key) dict can be read back in."""
     dict1 = {(0.5, 0.5): [1, 2, 3, 4, 5]}
-    fname = 'mattpy/tests/data/test_write.json'
+    fname = 'mattpy/tests/data/json_test_folder/test_write.json'
     dict2 = json_io.read_dict_from_disk(fname)
     assert dict1 == dict2
 
@@ -67,5 +67,6 @@ def test_dump_all_to_json():
     fdir = 'mattpy/tests/data/'
     test = json_io.dump_all_to_json(fdir, search_str='spectra*.txt',
                                     json_file='spectra_dict.json',
+                                    json_dir=fdir + 'json_test_folder',
                                     verify=True)
     assert test
