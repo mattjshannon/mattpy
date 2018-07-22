@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-test_examples.py
+test_json_io.py
 
 Test whether json_io.py behaves as expected."""
 

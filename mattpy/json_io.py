@@ -28,6 +28,7 @@ def verify_dict_equality(dict1, dict2):
     # Test for equality.
     if set(dict1) == set(dict2):
         print('JSON integrity verified.')
+        print()
     else:
         print(dict1.keys())
         print(dict2.keys())
@@ -173,6 +174,10 @@ def dump_all_to_json(filedir, search_str='spectra*.txt',
         filedir (str): Directory containg 'spectra*.txt'.
         search_str (str): Glob search string for files to include.
         json_fname (str): JSON filename.
+
+    Note:
+        Places resulting JSON files in the same directory as the .txt
+            PAHdb files.
     """
 
     mydict = convert_txt_to_dict(filedir, search_str)
