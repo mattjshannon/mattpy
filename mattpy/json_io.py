@@ -56,7 +56,13 @@ def parse_one_spectrum_file(fname):
         return float(beta), float(ionfrac)
 
     beta, ionfrac = parse_filename(fname)
-    dataframe = pd.read_csv(fname, sep=',', names=['flux', 'na'])
+
+    try:
+        dataframe = pd.read_csv(fname, sep=',', names=['flux', 'na'])
+    except Exception as error:
+        print(error)
+
+    # Remove trivial column that arises from the csv format.
     del dataframe['na']
 
     spec_dict = dataframe.to_dict()
@@ -79,7 +85,12 @@ def convert_txt_to_dict(fdir, search_str='spectra*.txt'):
     """
 
     # Data to be combined.
-    spectra_files = np.sort(glob.glob(fdir + search_str))
+    try:
+        glob_files = glob.glob(fdir + search_str)
+    except IOError as error:
+        print(error)
+
+    spectra_files = np.sort(glob_files)
 
     # Dictionary for holding results.
     full_dict = {}
@@ -112,8 +123,11 @@ def write_dict_to_disk(fname, the_dict):
     # with open(fname, 'w') as f:
     #     json.dump(the_dict, f)
 
-    with open(fname, 'w') as f:
-        json.dump({str(k): v for k, v in the_dict.items()}, f)
+    try:
+        with open(fname, 'w') as f:
+            json.dump({str(k): v for k, v in the_dict.items()}, f)
+    except IOError as error:
+        print(error)
 
     print('Wrote dictionary to disk: ', fname)
 
@@ -136,8 +150,11 @@ def read_dict_from_disk(fname):
 
     # load in two stages:#
     # (i) load json object
-    with open(fname, 'r') as f:
-        obj = json.load(f)
+    try:
+        with open(fname, 'r') as f:
+            obj = json.load(f)
+    except IOError as error:
+        print(error)
 
     # (ii) convert loaded keys from string back to tuple
     the_dict = {literal_eval(k): v for k, v in obj.items()}
