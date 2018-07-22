@@ -6,6 +6,11 @@ cache:
     - $HOME/.cache/pip
     - $HOME/.ccache  # https://github.com/travis-ci/travis-ci/issues/5853
 
+env:
+  global:
+    # Doctr deploy key for mattjshannon/mattpy
+    - secure: "VnDgSVHWw7yQcHnMJd5UOhtBDr/JOtVMSd1CRq275L3jzrO+PPimsEa4aFyqEC/gs5+LqgiTazCIDAuagvbqEa0+7OlJDNPUCHJnfnkTS9AaFR19Y/iYSOz4f6oGPALmJLMlrHurHEFwpmt2Fgd2i5vEZB4fq67cA5J2me/R0vdPsFZluZ3L4J4f1igOvE9Jj6AfqJYS+LQtUi2hZGTncrocEbLUMCzHdda3CP9zSubYPjq7y5YcrvhgKCy5rRreafIc7+/udp/G+n3L7yn5dpyYAtPDMUCVOQQW5bmg0sxrXU/grLfEpwTlJS47vEdsMh/mR5aALmm08Ol7nTkFE35UYo9LlqqNbNyj/wyOuqYDjOoqm7XEp5e6mmgZw1XW/AOeFTmL8ee+WhXXo9j36G+6HOK6X9h+kkyZkb1QdXfNAkaslxR7RpLsrcDfNS3Y1tXORc8KwwMs2IRrZQ6lUAX7PGx2FFx8lyX3EhToVD9HvMGZJCIFp8YZqMDgoC3jzjdgaLm1yLwp1qz2Dr7RAyzrocZX0DwZin2aVUl74fpekIbGXvG4drq7xyhlhw/jN2mt3PIu70Vi4VUGgo+dSs1vEGeaOed3Ah0O24ZduRNYxD0ILKKd9RxzBiRvR20SG0y6BPS+7/gxMw0/Vx1yRor5OhsjjN330m6SFmINQZM="
+
 install:
   # Install this package and the packages listed in requirements.txt.
   - pip install .
@@ -17,4 +22,7 @@ script:
   - coverage report -m  # Generate test coverage report.
   - codecov  # Upload the report to codecov.
   - flake8 --max-line-length=115  # Enforce code style (but relax line length limit a bit).
+  - set -e
   - make -C docs html  # Build the documentation.
+  - pip install doctr
+  - doctr deploy --built-docs docs/build/html .  # Publish the documentation.
