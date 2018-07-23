@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 
 from ast import literal_eval
-from ipdb import set_trace as st
 
 
 def ensure_dir(path):
@@ -62,7 +61,8 @@ def verify_dataframe_equality(df1, df2):
     else:
         print(df1.shape)
         print(df2.shape)
-        raise ValueError("Dataframe modified from write/read cycle..")
+        print("Dataframes not equal.")
+        return False
 
     return True
 
@@ -164,6 +164,26 @@ def write_dataframe_to_pickle(fname, dataframe):
     return True
 
 
+def read_dataframe_from_pickle(fname):
+    """Read a dataframe from a pickle.
+
+    Args:
+        fname (str): Filename of the pickle.
+
+    Returns:
+        dataframe (pd.DataFrame): Containing flux, beta, ionfrac.
+    """
+
+    try:
+        dataframe = pd.read_pickle(fname)
+    except Exception as error:
+        raise(error)
+
+    print('Read dataframe from pickle: ', fname)
+
+    return dataframe
+
+
 def write_dict_to_json(fname, the_dict):
     """Write dictionary to JSON.
 
@@ -247,12 +267,18 @@ def dump_all_to_disk(file_dir, search_str='spectra*.txt',
     else:
         raise ValueError("Unknown method for saving to disk.")
 
+    # Make sure the write/read operations leave the object unchanged.
     if verify:
         if method == 'pickle':
-            verify_dataframe_equality(df, pd.read_pickle(save_path))
+            # Test for dataframe equality.
+            eq = verify_dataframe_equality(df, pd.read_pickle(save_path))
+            if not eq:
+                raise ValueError('Dataframes not equal.')
         elif method == 'json':
-            verify_dict_equality(mydict, read_dict_from_disk(save_path))
-
+            # Test for dictionary equality.
+            eq = verify_dict_equality(mydict, read_dict_from_json(save_path))
+            if not eq:
+                raise ValueError('Dicts not equal.')
 
     return True
 
