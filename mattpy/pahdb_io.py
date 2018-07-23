@@ -33,15 +33,14 @@ def convert_folder_cont_fit(base_dir, sub_dir=None, save_dir=None,
     if sub_dir:
         working_dir += sub_dir
         working_dir = data_io.ensure_dir(working_dir)
-
         # Identify output files with (e.g.,) '_run_lorentz'.
-        save_file_contflux = 'contflux_dict_' + sub_dir + sfx
-        save_file_contknots = 'contknots_dict_' + sub_dir + sfx
-        save_file_cont77 = 'cont77_dict_' + sub_dir + sfx
+        save_file_contflux = 'pickles_' + sub_dir + '_contflux' + sfx
+        save_file_contknots = 'pickles_' + sub_dir + '_contknots' + sfx
+        save_file_cont77 = 'pickles_' + sub_dir + '_cont77' + sfx
     else:
-        save_file_contflux = 'contflux_dict_run' + sfx
-        save_file_contknots = 'contknots_dict_run' + sfx
-        save_file_cont77 = 'cont77_dict_run' + sfx
+        save_file_contflux = 'pickles_run_unknown_contflux' + sfx
+        save_file_contknots = 'pickles_run_unknown_contknots' + sfx
+        save_file_cont77 = 'pickles_run_unknown_cont77' + sfx
 
     # Collate the spline vectors.
     data_io.dump_all_to_disk(working_dir,
@@ -92,11 +91,9 @@ def convert_folder_spectra(base_dir, sub_dir=None, save_dir=None,
     if sub_dir:
         working_dir += sub_dir
         working_dir = data_io.ensure_dir(working_dir)
-
-        save_file_spectra = 'spectra_' + sub_dir + sfx
-
+        save_file_spectra = 'pickles_' + sub_dir + '_spectra' + sfx
     else:
-        save_file_spectra = 'spectra_run' + sfx
+        save_file_spectra = 'pickles_run_unknown_spectra' + sfx
 
     # Collate the spectra..
     data_io.dump_all_to_disk(working_dir,

@@ -35,8 +35,7 @@ def verify_dict_equality(dict1, dict2):
 
     # Test for equality.
     if set(dict1) == set(dict2):
-        print('Dictionary integrity verified.')
-        print()
+        print('...verified.')
     else:
         print(dict1.keys())
         print(dict2.keys())
@@ -56,8 +55,7 @@ def verify_dataframe_equality(df1, df2):
         True if succesful.
     """
     if df1.equals(df2):
-        print('Dataframe integrity verified.')
-        print()
+        print('...verified.')
     else:
         print(df1.shape)
         print(df2.shape)
