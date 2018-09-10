@@ -5,9 +5,11 @@ data_io.py
 Some packaging tools for manipulating PAHdb run results.
 """
 
+import errno
 import glob
 import json
 import numpy as np
+import os
 import pandas as pd
 
 from ast import literal_eval
@@ -20,6 +22,15 @@ def ensure_dir(path):
         if path[-1] != '/':
             path += '/'
     return path
+
+
+def ensure_exists(path):
+    """Ensure the path exists; if not, make the directory."""
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
 
 
 def verify_dict_equality(dict1, dict2):
