@@ -6,9 +6,7 @@ Some packaging tools for manipulating PAHdb run results.
 """
 
 import errno
-import glob
 import json
-import numpy as np
 import os
 import pandas as pd
 

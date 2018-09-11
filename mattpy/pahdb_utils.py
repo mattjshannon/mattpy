@@ -12,7 +12,7 @@ import os
 import pandas as pd
 import shutil
 
-from mattpy.io import ensure_dir, ensure_exists, write_dataframe_to_pickle
+from mattpy import io
 
 
 def convert_folder_cont_fit(base_dir, sub_dir=None, save_dir=None,
@@ -29,7 +29,7 @@ def convert_folder_cont_fit(base_dir, sub_dir=None, save_dir=None,
         True if successful.
     """
 
-    working_dir = ensure_dir(base_dir) + 'cont_fit/'
+    working_dir = io.ensure_dir(base_dir) + 'cont_fit/'
 
     if method == 'pickle':
         sfx = '.pkl'
@@ -39,7 +39,7 @@ def convert_folder_cont_fit(base_dir, sub_dir=None, save_dir=None,
     # add subdirectory.
     if sub_dir:
         working_dir += sub_dir
-        working_dir = ensure_dir(working_dir)
+        working_dir = io.ensure_dir(working_dir)
         # Identify output files with (e.g.,) '_run_lorentz'.
         save_file_contflux = 'pickles_' + sub_dir + '_contflux' + sfx
         save_file_contknots = 'pickles_' + sub_dir + '_contknots' + sfx
@@ -87,7 +87,7 @@ def convert_folder_spectra(base_dir, sub_dir=None, save_dir=None,
         True if successful.
     """
 
-    working_dir = ensure_dir(base_dir) + 'spectra/'
+    working_dir = io.ensure_dir(base_dir) + 'spectra/'
 
     if method == 'pickle':
         sfx = '.pkl'
@@ -97,7 +97,7 @@ def convert_folder_spectra(base_dir, sub_dir=None, save_dir=None,
     # add subdirectory.
     if sub_dir:
         working_dir += sub_dir
-        working_dir = ensure_dir(working_dir)
+        working_dir = io.ensure_dir(working_dir)
         save_file_spectra = 'pickles_' + sub_dir + '_spectra' + sfx
     else:
         save_file_spectra = 'pickles_run_unknown_spectra' + sfx
@@ -236,7 +236,7 @@ def convert_txt_to_dict(file_dir, search_str='spectra*.txt'):
 
     # Data to be combined.
     try:
-        glob_files = glob.glob(ensure_dir(file_dir) + search_str)
+        glob_files = glob.glob(io.ensure_dir(file_dir) + search_str)
     except IOError as error:
         raise(error)
 
@@ -273,16 +273,16 @@ def regular_run_structure(run_dir, run_name):
         else:
             return True
 
-    working_dir = ensure_dir(run_dir) + run_name
-    working_dir = ensure_dir(working_dir)
+    working_dir = io.ensure_dir(run_dir) + run_name
+    working_dir = io.ensure_dir(working_dir)
 
     if not is_a_run_directory(working_dir):
         print("Not a run directory: ", working_dir)
         return
 
     save_dir = run_dir + '_pickled/' + run_name
-    save_dir = ensure_dir(save_dir)
-    ensure_exists(save_dir)
+    save_dir = io.ensure_dir(save_dir)
+    io.ensure_exists(save_dir)
 
     # First, copy the spectra themselves as a pickle.
     convert_folder_spectra(working_dir,
@@ -357,21 +357,21 @@ def dump_all_to_disk(file_dir, search_str='spectra*.txt',
         Method can be either 'pickle' or 'json'.
     """
 
-    file_dir = ensure_dir(file_dir)
+    file_dir = io.ensure_dir(file_dir)
     mydict = convert_txt_to_dict(file_dir, search_str)
 
     # Determine location for output.
     if save_dir:
-        save_path = ensure_dir(save_dir) + save_file
+        save_path = io.ensure_dir(save_dir) + save_file
     else:
-        save_path = ensure_dir(file_dir) + save_file
+        save_path = io.ensure_dir(file_dir) + save_file
 
     # Write to disk. If pickling, convert to dataframe first.
     if method == 'pickle':
         df = pd.DataFrame.from_dict(mydict)
-        write_dataframe_to_pickle(save_path, df)
+        io.write_dataframe_to_pickle(save_path, df)
     elif method == 'json':
-        write_dict_to_json(save_path, mydict)
+        io.write_dict_to_json(save_path, mydict)
     else:
         raise ValueError("Unknown method for saving to disk.")
 
@@ -379,18 +379,17 @@ def dump_all_to_disk(file_dir, search_str='spectra*.txt',
     if verify:
         if method == 'pickle':
             # Test for dataframe equality.
-            eq = verify_dataframe_equality(df, pd.read_pickle(save_path))
+            eq = io.verify_dataframe_equality(df, pd.read_pickle(save_path))
             if not eq:
                 raise ValueError('Dataframes not equal.')
         elif method == 'json':
             # Test for dictionary equality.
-            eq = verify_dict_equality(mydict, read_dict_from_json(save_path))
+            eq = io.verify_dict_equality(
+                mydict, io.read_dict_from_json(save_path))
             if not eq:
                 raise ValueError('Dicts not equal.')
 
     return True
-
-
 
 
 def main():
