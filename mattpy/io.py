@@ -1,77 +1,14 @@
 #!/usr/bin/env python3
 """
-data_io.py
+io.py
 
 Some packaging tools for manipulating PAHdb run results.
 """
 
-import errno
 import json
-import os
 import pandas as pd
 
 from ast import literal_eval
-
-
-def ensure_dir(path):
-    """Ensure the string is a directory, with a slash as its last
-        character."""
-    if path != '':
-        if path[-1] != '/':
-            path += '/'
-    return path
-
-
-def ensure_exists(path):
-    """Ensure the path exists; if not, make the directory."""
-    try:
-        os.makedirs(path)
-    except OSError as exception:
-        if exception.errno != errno.EEXIST:
-            raise
-
-
-def verify_dict_equality(dict1, dict2):
-    """Ensure that the dictionary is unchnged after writing/reading.
-
-    Args:
-        dict1 (dict): Dictioanry 1.
-        dict2 (dict): Dictionary 2.
-
-    Returns:
-        True if succesful.
-    """
-
-    # Test for equality.
-    if set(dict1) == set(dict2):
-        print('...verified.')
-    else:
-        print(dict1.keys())
-        print(dict2.keys())
-        raise KeyError("Dictionary error, integrity compromised.")
-
-    return True
-
-
-def verify_dataframe_equality(df1, df2):
-    """Ensure that the dataframe is unchnged after writing/reading.
-
-    Args:
-        df1 (pd.DataFrame): Dataframe 1.
-        df1 (pd.DataFrame): Dataframe 2.
-
-    Returns:
-        True if succesful.
-    """
-    if df1.equals(df2):
-        print('...verified.')
-    else:
-        print(df1.shape)
-        print(df2.shape)
-        print("Dataframes not equal.")
-        return False
-
-    return True
 
 
 def write_dataframe_to_pickle(fname, dataframe):

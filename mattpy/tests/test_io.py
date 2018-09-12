@@ -11,41 +11,7 @@ import pandas as pd
 from mattpy import io
 
 
-def test_ensure_dir():
-    assert io.ensure_dir('') == ''
-    assert io.ensure_dir('test') == 'test/'
-    assert io.ensure_dir('test/') == 'test/'
-    return
-
-
-def test_verify_dict_equality():
-    """Test that a dictionary is unchnged after JSON write."""
-    d1 = {}
-    d2 = {}
-    assert io.verify_dict_equality(d1, d2)
-
-    d1 = {'test': 1}
-    d2 = {'test': 1}
-    assert io.verify_dict_equality(d1, d2)
-
-    d1 = {'a': 1, 'b': 2}
-    d2 = {'b': 2, 'a': 1}
-    assert io.verify_dict_equality(d1, d2)
-
-
-def test_verify_dataframe_equality():
-    df1 = pd.DataFrame()
-    df2 = pd.DataFrame()
-    assert io.verify_dataframe_equality(df1, df2)
-
-    d = {'col1': [1, 2], 'col2': [3, 4]}
-    df = pd.DataFrame(data=d)
-    assert not io.verify_dataframe_equality(df, df2)
-
-    return
-
-
-def write_dataframe_to_pickle():
+def test_write_dataframe_to_pickle():
     """Test writing a dataframe to pickle."""
     d = {'col1': [1, 2], 'col2': [3, 4]}
     df = pd.DataFrame(data=d)
