@@ -6,7 +6,7 @@ import matplotlib.gridspec as gridspec
 import seaborn.apionly as sns
 import matplotlib.patches as mpatches
 
-from . import mylineid as lid
+from mattpy import mylineid as lid
 
 from mattpy.utils import to_sigma, norm, get_home_dir, find_nearest, quant_str
 from mattpy import continuum_fluxes as cf

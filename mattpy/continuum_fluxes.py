@@ -18,7 +18,7 @@ def measure(wave_knots, wave, flux, find_min, width, smooth_flag,
     holdFlux = []
 
     smoowave = wave
-    smooflux = smooth.smooth(flux, window_len=smoothsize)
+    smooflux = smooth(flux, window_len=smoothsize)
 
     for i in range(len(wave_knots)):
 
@@ -57,7 +57,7 @@ def measure(wave_knots, wave, flux, find_min, width, smooth_flag,
                 holdFlux.append(minFlux)
             else:
                 tmpwave = lamb
-                tmpflux = influx[find_nearest.find_nearest(inwave, tmpwave)]
+                tmpflux = influx[find_nearest(inwave, tmpwave)]
                 holdWave.append(tmpwave)
                 holdFlux.append(tmpflux)
 
