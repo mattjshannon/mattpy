@@ -1086,7 +1086,7 @@ Outputs:
 
             # Calculate the jacobian matrix
             self.status = 2
-            catch_msg = 'calling MPFIT_FDJAC2'
+            # catch_msg = 'calling MPFIT_FDJAC2'
             fjac = self.fdjac2(fcn, x, fvec, step, qulim, ulim, dside,
                                epsfcn=epsfcn,
                                autoderivative=autoderivative, dstep=dstep,
@@ -1097,7 +1097,7 @@ Outputs:
 
             # Determine if any of the parameters are pegged at the limits
             if qanylim:
-                catch_msg = 'zeroing derivatives of pegged parameters'
+                # catch_msg = 'zeroing derivatives of pegged parameters'
                 whlpeg = (numpy.nonzero(qllim & (x == llim)))[0]
                 nlpeg = len(whlpeg)
                 whupeg = (numpy.nonzero(qulim & (x == ulim)))[0]
@@ -1121,7 +1121,7 @@ Outputs:
 
             # On the first iteration if "diag" is unspecified, scale
             # according to the norms of the columns of the initial jacobian
-            catch_msg = 'rescaling diagonal elements'
+            # catch_msg = 'rescaling diagonal elements'
             if self.niter == 1:
                 if (rescale == 0) or (len(diag) < n):
                     diag = wa2.copy()
@@ -1136,7 +1136,7 @@ Outputs:
                     delta = factor
 
             # Form (q transpose)*fvec and store the first n components in qtf
-            catch_msg = 'forming (q transpose)*fvec'
+            # catch_msg = 'forming (q transpose)*fvec'
             wa4 = fvec.copy()
             for j in range(n):
                 lj = ipvt[j]
@@ -1164,7 +1164,7 @@ Outputs:
             # if ct GT 0 then goto, FAIL_OVERFLOW
 
             # Compute the norm of the scaled gradient
-            catch_msg = 'computing the scaled gradient'
+            # catch_msg = 'computing the scaled gradient'
             gnorm = 0.
             if self.fnorm != 0:
                 for j in range(n):
@@ -1190,7 +1190,7 @@ Outputs:
             while(1):
 
                 # Determine the levenberg-marquardt parameter
-                catch_msg = 'calculating LM parameter (MPFIT_)'
+                # catch_msg = 'calculating LM parameter (MPFIT_)'
                 [fjac, par, wa1, wa2] = self.lmpar(fjac, ipvt, diag, qtf,
                                                    delta, wa1, wa2, par=par)
                 # Store the direction p and x+p. Calculate the norm of p
@@ -1212,7 +1212,7 @@ Outputs:
 
                     if qanylim:
                         # Do not allow any steps out of bounds
-                        catch_msg = 'checking for a step out of bounds'
+                        # catch_msg = 'checking for a step out of bounds'
                         if nlpeg > 0:
                             wa1[whlpeg] = numpy.clip(
                                 wa1[whlpeg], 0., numpy.max(wa1))
@@ -1282,7 +1282,7 @@ Outputs:
 
                 # Evaluate the function at x+p and calculate its norm
                 # mperr = 0
-                catch_msg = 'calling ' + str(fcn)
+                # catch_msg = 'calling ' + str(fcn)
                 [self.status, wa4] = self.call(fcn, self.params, functkw)
                 if self.status < 0:
                     self.errmsg = \
@@ -1291,7 +1291,7 @@ Outputs:
                 fnorm1 = self.enorm(wa4)
 
                 # Compute the scaled actual reduction
-                catch_msg = 'computing convergence criteria'
+                # catch_msg = 'computing convergence criteria'
                 actred = -1.
                 if (0.1 * fnorm1) < self.fnorm:
                     actred = - (fnorm1 / self.fnorm)**2 + 1.
@@ -1386,7 +1386,7 @@ Outputs:
                 break
         # End of outer loop.
 
-        catch_msg = 'in the termination phase'
+        # catch_msg = 'in the termination phase'
         # Termination, either normal or user imposed.
         if len(self.params) == 0:
             return
@@ -1395,9 +1395,9 @@ Outputs:
         else:
             self.params[ifree] = x
         if (nprint > 0) and (self.status > 0):
-            catch_msg = 'calling ' + str(fcn)
+            # catch_msg = 'calling ' + str(fcn)
             [status, fvec] = self.call(fcn, self.params, functkw)
-            catch_msg = 'in the termination phase'
+            # catch_msg = 'in the termination phase'
             self.fnorm = self.enorm(fvec)
 
         if (self.fnorm is not None) and (fnorm1 is not None):
@@ -1413,7 +1413,7 @@ Outputs:
             if (n > 0) and (sz[0] >= n) and (sz[1] >= n) \
                     and (len(ipvt) >= n):
 
-                catch_msg = 'computing the covariance matrix'
+                # catch_msg = 'computing the covariance matrix'
                 cv = self.calc_covar(fjac[0:n, 0:n], ipvt[0:n])
                 cv.shape = [n, n]
                 nn = len(xall)
@@ -1425,7 +1425,7 @@ Outputs:
                     self.covar[ifree, ifree[i]] = cv[:, i]
 
                 # Compute errors in parameters
-                catch_msg = 'computing parameter errors'
+                # catch_msg = 'computing parameter errors'
                 self.perror = numpy.zeros(nn, dtype=float)
                 d = numpy.diagonal(self.covar)
                 wh = (numpy.nonzero(d >= 0))[0]
@@ -1436,7 +1436,7 @@ Outputs:
     def __str__(self):
         return {'params': self.params,
                 'niter': self.niter,
-                'params': self.params,
+                # 'params': self.params,
                 'covar': self.covar,
                 'perror': self.perror,
                 'status': self.status,
@@ -1516,9 +1516,9 @@ Outputs:
                 values.append(default)
 
         # Convert to numeric arrays if possible
-        test = default
-        if isinstance(default, list):
-            test = default[0]
+        # test = default
+        # if isinstance(default, list):
+        #     test = default[0]
         values = numpy.asarray(values)
         return values
 
@@ -1955,7 +1955,7 @@ Outputs:
         if self.debug:
             print('Entering qrsolv...')
         sz = r.shape
-        m = sz[0]
+        # m = sz[0]
         n = sz[1]
 
         # copy r and (q transpose)*b to preserve input and initialize s.
@@ -1968,11 +1968,11 @@ Outputs:
 
         # Eliminate the diagonal matrix d using a givens rotation
         for j in range(n):
-            l = ipvt[j]
-            if diag[l] == 0:
+            lx = ipvt[j]
+            if diag[lx] == 0:
                 break
             sdiag[j:] = 0
-            sdiag[j] = diag[l]
+            sdiag[j] = diag[lx]
 
             # The transformations to eliminate the row of d modify only a
             # single element of (q transpose)*b beyond the first n, which
@@ -2127,7 +2127,7 @@ Outputs:
         dwarf = self.machar.minnum
         machep = self.machar.machep
         sz = r.shape
-        m = sz[0]
+        # m = sz[0]
         n = sz[1]
 
         # Compute and store in x the gauss-newton direction.  If the
@@ -2334,7 +2334,7 @@ Outputs:
         r.shape = [n, n]
 
         # For the inverse of r in the full upper triangle of r
-        l = -1
+        ll = -1
         tolr = tol * numpy.abs(r[0, 0])
         for k in range(n):
             if numpy.abs(r[k, k]) <= tolr:
@@ -2344,12 +2344,12 @@ Outputs:
                 temp = r[k, k] * r[j, k]
                 r[j, k] = 0.
                 r[0:j + 1, k] = r[0:j + 1, k] - temp * r[0:j + 1, j]
-            l = k
+            ll = k
 
         # Form the full upper triangle of the inverse of (r transpose)*r
         # in the full upper triangle of r
-        if l >= 0:
-            for k in range(l + 1):
+        if ll >= 0:
+            for k in range(ll + 1):
                 for j in range(k):
                     temp = r[j, k]
                     r[0:j + 1, j] = r[0:j + 1, j] + temp * r[0:j + 1, k]
@@ -2361,7 +2361,7 @@ Outputs:
         wa = numpy.repeat([r[0, 0]], n)
         for j in range(n):
             jj = ipvt[j]
-            sing = j > l
+            sing = j > ll
             for i in range(j + 1):
                 if sing:
                     r[i, j] = 0.

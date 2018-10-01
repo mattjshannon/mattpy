@@ -105,6 +105,22 @@ def to_sigma(fwhm):
     return fwhm / constant
 
 
+def compute_feature_uncertainty(gposition, gsigma, wave_feat, rms,
+                                manual_range=0):
+    """Return the uncertainty of an emission line measurement."""
+
+    if isinstance(manual_range, int):
+        myrange = [gposition - (3. * gsigma), gposition + (3. * gsigma)]
+    else:
+        myrange = manual_range
+
+    dl = wave_feat[1] - wave_feat[0]
+    N = (myrange[1] - myrange[0]) / dl
+    feature_uncertainty = (rms * np.sqrt(N) * dl * 2)
+
+    return feature_uncertainty
+
+
 def verify_dict_equality(dict1, dict2):
     """Ensure that the dictionary is unchnged after writing/reading.
 
