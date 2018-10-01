@@ -170,16 +170,3 @@ if __name__ == '__main__':
 
     test = Spectrum(wave=wave, flux=flux, flag_smooth=True)
     test.plot()
-
-
-
-
-
-
-
-
-
-
-
-
-
