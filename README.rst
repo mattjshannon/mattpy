@@ -5,9 +5,6 @@ mattpy
 .. image:: https://img.shields.io/travis/mattjshannon/mattpy.svg
         :target: https://travis-ci.org/mattjshannon/mattpy
 
-.. image:: https://img.shields.io/pypi/v/mattpy.svg
-        :target: https://pypi.python.org/pypi/mattpy
-
 
 Tools for astronomical analysis.
 
