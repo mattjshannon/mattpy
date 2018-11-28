@@ -35,6 +35,8 @@ def convert_folder_cont_fit(base_dir, sub_dir=None, save_dir=None,
         sfx = '.pkl'
     elif method == 'json':
         sfx = '.json'
+    else:
+        raise ValueError("Method must be one of ['pickle', 'json'].")
 
     # add subdirectory.
     if sub_dir:
@@ -93,6 +95,8 @@ def convert_folder_spectra(base_dir, sub_dir=None, save_dir=None,
         sfx = '.pkl'
     elif method == 'json':
         sfx = '.json'
+    else:
+        raise ValueError("Method must be one of ['pickle', 'json'].")
 
     # add subdirectory.
     if sub_dir:
@@ -196,13 +200,13 @@ def parse_one_spectrum_file(fname):
         spec_dict (dict): Containing flux array, beta, ionfrac.
     """
 
-    def parse_filename(fname):
+    def parse_filename(filename):
         """Extract beta and ionfrac values from filename."""
 
-        beta = fname.split('_beta_')[1].split('_')[0]
-        ionfrac = fname.split('_ionfrac_')[-1].split('.txt')[0]
+        beta_value = filename.split('_beta_')[1].split('_')[0]
+        ionfrac_value = filename.split('_ionfrac_')[-1].split('.txt')[0]
 
-        return float(beta), float(ionfrac)
+        return float(beta_value), float(ionfrac_value)
 
     beta, ionfrac = parse_filename(fname)
 
@@ -210,7 +214,7 @@ def parse_one_spectrum_file(fname):
     try:
         dataframe = pd.read_csv(fname, sep=',', names=['flux', 'na'])
     except Exception as error:
-        raise(error)
+        raise error
 
     # Remove trivial column that arises from the csv format.
     del dataframe['na']
@@ -227,6 +231,7 @@ def convert_txt_to_dict(file_dir, search_str='spectra*.txt'):
 
     Args:
         file_dir (str): location of the PAHdb spectra.
+        search_str (str): Regex search string for identifying all spectra.
 
     Note:
         Utilizes pandas DataFrame for reading.
@@ -238,7 +243,7 @@ def convert_txt_to_dict(file_dir, search_str='spectra*.txt'):
     try:
         glob_files = glob.glob(utils.ensure_dir(file_dir) + search_str)
     except IOError as error:
-        raise(error)
+        raise error
 
     spectra_files = np.sort(glob_files)
 
@@ -347,9 +352,12 @@ def dump_all_to_disk(file_dir, search_str='spectra*.txt',
     Args:
         file_dir (str): Directory containg 'spectra*.txt'.
         search_str (str): Glob search string for files to include.
-        json_fname (str): JSON filename.
-        json_dir (str): Desired JSON output directory. If None,
+        save_file (str): Output filename.
+        save_dir (str): Desired JSON output directory. If None,
             will default to filedir.
+        method (str): Whether to create a pickle or JSON.
+        verify (bool): Whether to verify the output matches the input after
+            being written/read.
 
     Note:
         Places resulting JSON files in the same directory as the .txt
@@ -370,24 +378,16 @@ def dump_all_to_disk(file_dir, search_str='spectra*.txt',
     if method == 'pickle':
         df = pd.DataFrame.from_dict(mydict)
         io.write_dataframe_to_pickle(save_path, df)
+        if verify:
+            load_df = pd.read_pickle(save_path)
+            assert utils.verify_dataframe_equality(df, load_df)
     elif method == 'json':
         io.write_dict_to_json(save_path, mydict)
+        if verify:
+            load_dict = io.read_dict_from_json(save_path)
+            assert utils.verify_dict_equality(mydict, load_dict)
     else:
         raise ValueError("Unknown method for saving to disk.")
-
-    # Make sure the write/read operations leave the object unchanged.
-    if verify:
-        if method == 'pickle':
-            # Test for dataframe equality.
-            eq = utils.verify_dataframe_equality(df, pd.read_pickle(save_path))
-            if not eq:
-                raise ValueError('Dataframes not equal.')
-        elif method == 'json':
-            # Test for dictionary equality.
-            eq = utils.verify_dict_equality(
-                mydict, io.read_dict_from_json(save_path))
-            if not eq:
-                raise ValueError('Dicts not equal.')
 
     return True
 

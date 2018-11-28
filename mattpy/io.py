@@ -25,7 +25,7 @@ def write_dataframe_to_pickle(fname, dataframe):
     try:
         dataframe.to_pickle(fname)
     except Exception as error:
-        raise(error)
+        raise error
 
     print('Wrote dataframe to pickle: ', fname)
 
@@ -45,7 +45,7 @@ def read_dataframe_from_pickle(fname):
     try:
         dataframe = pd.read_pickle(fname)
     except Exception as error:
-        raise(error)
+        raise error
 
     print('Read dataframe from pickle: ', fname)
 
@@ -65,7 +65,7 @@ def write_dict_to_json(fname, the_dict):
         with open(fname, 'w') as f:
             json.dump({str(k): v for k, v in the_dict.items()}, f)
     except Exception as error:
-        raise(error)
+        raise error
 
     print('Wrote dictionary to disk: ', fname)
 
@@ -88,7 +88,7 @@ def read_dict_from_json(fname):
         with open(fname, 'r') as f:
             obj = json.load(f)
     except IOError as error:
-        raise(error)
+        raise error
 
     # Convert the keys back to tuples.
     the_dict = {literal_eval(k): v for k, v in obj.items()}
