@@ -115,21 +115,21 @@ def compute_feature_uncertainty(gposition, gsigma, wave_feat, rms,
         myrange = manual_range
 
     dl = wave_feat[1] - wave_feat[0]
-    N = (myrange[1] - myrange[0]) / dl
-    feature_uncertainty = (rms * np.sqrt(N) * dl * 2)
+    resolving_power = (myrange[1] - myrange[0]) / dl
+    feature_uncertainty = (rms * np.sqrt(resolving_power) * dl * 2)
 
     return feature_uncertainty
 
 
 def verify_dict_equality(dict1, dict2):
-    """Ensure that the dictionary is unchnged after writing/reading.
+    """Ensure that the dictionary is unchanged after writing/reading.
 
     Args:
         dict1 (dict): Dictioanry 1.
         dict2 (dict): Dictionary 2.
 
     Returns:
-        True if succesful.
+        True if successful.
     """
 
     # Test for equality.
@@ -144,14 +144,14 @@ def verify_dict_equality(dict1, dict2):
 
 
 def verify_dataframe_equality(df1, df2):
-    """Ensure that the dataframe is unchnged after writing/reading.
+    """Ensure that the dataframe is unchanged after writing/reading.
 
     Args:
         df1 (pd.DataFrame): Dataframe 1.
-        df1 (pd.DataFrame): Dataframe 2.
+        df2 (pd.DataFrame): Dataframe 2.
 
     Returns:
-        True if succesful.
+        True if successful.
     """
     if df1.equals(df2):
         print('...verified.')

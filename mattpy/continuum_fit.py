@@ -17,8 +17,8 @@ class Spectrum(object):
     """Create an object to hold fit parameters, anchors, etc.
 
     Attributes:
-        anchor_abscissa (np.array): Abscissa of anchor knots.
-        anchor_ordinate (np.array): Ordinate of anchor knots.
+        anchor_wave (np.array): Abscissa of anchor knots.
+        anchor_flux(np.array): Ordinate of anchor knots.
 
     """
 
@@ -29,15 +29,7 @@ class Spectrum(object):
                  flag_smooth=None, flag_findmin=None,
                  anchor_smooth_array=None, anchor_findmin_array=None,
                  anchor_width_array=None):
-        """Return a Spectrum object.
-
-        Note:
-            Hm, should require anchors? Or more general?
-
-        Args:
-            file_path (str):
-
-        """
+        """Return a Spectrum object."""
         self.wave = wave
         self.flux = flux
         self.csub = csub
