@@ -1,0 +1,816 @@
+#!/usr/bin/env python
+"""
+helpers.py
+
+Helpers functions for analyze_pahs.py
+"""
+
+from __future__ import print_function
+
+import errno
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+
+from scripts.mpfit import mpfit
+from scipy.integrate import simps
+# from scipy.optimize import fsolve
+
+
+def ensure_exists(path):
+    """Ensure the path exists; if not, make the directory."""
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
+
+
+def jy_to_si(flux_jy, wave):
+    """Returns a flux array (converted from Jy to W/m^2/micron)."""
+    flux_si = flux_jy * 3e-12 / wave**2
+    return flux_si
+
+
+def smooth(x, window_len=50, window='hanning'):
+    """Returns a smoothed version of an array, from Stack Overflow."""
+    if x.ndim != 1:
+        raise ValueError("smooth only accepts 1 dimension arrays.")
+    if x.size < window_len:
+        raise ValueError("Input vector must be bigger than window size.")
+    if window_len < 3:
+        return x
+
+    acceptable_windows = ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']
+    if window not in acceptable_windows:
+        raise ValueError("Window must be in: ", str(acceptable_windows))
+
+    s = np.r_[2 * x[0] - x[window_len - 1::-1], x,
+              2 * x[-1] - x[-1:-window_len:-1]]
+
+    if window == 'flat':
+        w = np.ones(window_len, 'd')
+    else:
+        w = eval('np.' + window + '(window_len)')
+
+    y = np.convolve(w / w.sum(), s, mode='same')
+
+    return y[window_len:-window_len + 1]
+
+
+def onedgaussian(x, H, A, dx, w):
+    """
+    Returns a 1-dimensional gaussian of form
+    H+A*np.exp(-(x-dx)**2/(2*w**2))
+    """
+    return H + A * np.exp(-(x - dx)**2 / (2 * w**2))
+
+
+def onedgaussfit(xax, data, err=None,
+                 params=[0, 1, 0, 1], fixed=[False, False, False, False],
+                 limitedmin=[False, False, False, True],
+                 limitedmax=[False, False, False, False],
+                 minpars=[0, 0, 0, 0], maxpars=[0, 0, 0, 0],
+                 quiet=True, shh=True, veryverbose=False,
+                 vheight=True, negamp=False, usemoments=False):
+    """
+    Parameters
+    ----------
+    xax : np.array
+        x axis
+    data : np.array
+        y axis
+    err : np.array
+        error corresponding to data
+    params : tuple
+        Fit parameters: Height of background, Amplitude, Shift, Width
+    fixed : bool
+        Is parameter fixed?
+    limitedmin/minpars : tuple
+        set lower limits on each parameter (default: width>0)
+    limitedmax/maxpars : tuple
+        set upper limits on each parameter
+    quiet : bool
+        should MPFIT output each iteration?
+    shh : bool
+        output final parameters?
+    usemoments : bool
+        replace default parameters with moments
+    Returns
+    -------
+    Fit parameters
+    Model
+    Fit errors
+    chi2
+    """
+
+    def mpfitfun(x, y, err):
+        if err is None:
+            def f(p, fjac=None): return [0, (y-onedgaussian(x, *p))]
+        else:
+            def f(p, fjac=None): return [0, (y-onedgaussian(x, *p))/err]
+        return f
+
+    if xax is None:
+        xax = np.arange(len(data))
+
+    if not vheight:
+        height = params[0]
+        fixed[0] = True
+    if usemoments:
+        params = onedmoments(xax, data, vheight=vheight, negamp=negamp, veryverbose=veryverbose)
+        if vheight is False:
+            params = [height]+params
+        if veryverbose:
+            print("OneD moments: h: %g  a: %g  c: %g  w: %g" % tuple(params))
+
+    parinfo = [{'n': 0, 'value': params[0], 'limits': [minpars[0], maxpars[0]],
+                'limited': [limitedmin[0], limitedmax[0]], 'fixed': fixed[0],
+                'parname': "HEIGHT", 'error': 0},
+               {'n': 1, 'value': params[1], 'limits': [minpars[1], maxpars[1]],
+                'limited': [limitedmin[1], limitedmax[1]], 'fixed': fixed[1],
+                'parname': "AMPLITUDE", 'error': 0},
+               {'n': 2, 'value': params[2], 'limits': [minpars[2], maxpars[2]],
+                'limited': [limitedmin[2], limitedmax[2]], 'fixed': fixed[2],
+                'parname': "SHIFT", 'error': 0},
+               {'n': 3, 'value': params[3], 'limits': [minpars[3], maxpars[3]],
+                'limited': [limitedmin[3], limitedmax[3]], 'fixed': fixed[3],
+                'parname': "WIDTH", 'error': 0}]
+
+    mp = mpfit(mpfitfun(xax, data, err), parinfo=parinfo, quiet=quiet)
+    mpp = mp.params
+    mpperr = mp.perror
+    chi2 = mp.fnorm
+
+    if mp.status == 0:
+        raise Exception(mp.errmsg)
+
+    if (not shh) or veryverbose:
+        print("Fit status: ", mp.status)
+        for i, p in enumerate(mpp):
+            parinfo[i]['value'] = p
+            print(parinfo[i]['parname'], p, " +/- ", mpperr[i])
+        print("Chi2: ", mp.fnorm, " Reduced Chi2: ", mp.fnorm/len(data), " DOF:", len(data)-len(mpp))
+
+    return mpp, onedgaussian(xax, *mpp), mpperr, chi2
+
+
+def n_gaussian(pars=None, a=None, dx=None, sigma=None):
+    """
+    Returns a function that sums over N gaussians, where N is the length of
+    a,dx,sigma *OR* N = len(pars) / 3
+    The background "height" is assumed to be zero (you must "baseline" your
+    spectrum before fitting)
+    pars  - a list with len(pars) = 3n, assuming a,dx,sigma repeated
+    dx    - offset (velocity center) values
+    sigma - line widths
+    a     - amplitudes
+    """
+    if len(pars) % 3 == 0:
+        a = [pars[ii] for ii in range(0, len(pars), 3)]
+        dx = [pars[ii] for ii in range(1, len(pars), 3)]
+        sigma = [pars[ii] for ii in range(2, len(pars), 3)]
+    elif not(len(dx) == len(sigma) == len(a)):
+        raise ValueError("Wrong array lengths! dx: %i  sigma: %i  a: %i" %
+                         (len(dx), len(sigma), len(a)))
+
+    def g(x):
+        v = np.zeros(len(x))
+        for i in range(len(dx)):
+            v += a[i] * np.exp(-(x-dx[i])**2 / (2.0*sigma[i]**2))
+        return v
+    return g
+
+
+def multigaussfit(xax, data, ngauss=1, err=None, params=[1, 0, 1],
+                  fixed=[False, False, False], limitedmin=[False, False, True],
+                  limitedmax=[False, False, False], minpars=[0, 0, 0],
+                  maxpars=[0, 0, 0],
+                  quiet=True, shh=True, veryverbose=False):
+    """
+    An improvement on onedgaussfit.  Lets you fit multiple gaussians.
+    Parameters
+    ----------
+    xax : np.array
+      x axis
+    data : np.array
+      y axis
+    err : np.array or None
+      error corresponding to data
+    ngauss : int
+      How many gaussians to fit?  Default 1 (this could supersede
+      onedgaussfit). Parameters below need to have lenght of 3*ngauss. If
+      ``ngauss``>1 and their lenght is 3, they will be replicated ngaus
+      times, otherwise they will be reset to defaults.
+    params : list
+      Fit parameters: [amplitude, offset, width] * ngauss
+      If len(params) % 3 == 0, ngauss will be set to len(params) / 3
+    fixed : list of bools
+      Is parameter fixed?
+    limitedmin/minpars : list
+      set lower limits on each parameter (default: width>0)
+    limitedmax/maxpars : list
+      set upper limits on each parameter
+    minpars : list
+    maxpars : list
+    quiet : bool
+      should MPFIT output each iteration?
+    shh : bool
+      output final parameters?
+    veryverbose : bool
+    Returns
+    -------
+    Fit parameters
+    Model
+    Fit errors
+    chi2
+    """
+
+    if len(params) != ngauss and (len(params) // 3) > ngauss:
+        ngauss = len(params) // 3
+
+    if isinstance(params, np.ndarray):
+        params = params.tolist()
+
+    # make sure all various things are the right length; if they're not, fix them using the defaults
+    for parlist in (params, fixed, limitedmin, limitedmax, minpars, maxpars):
+        if len(parlist) != 3*ngauss:
+            # if you leave the defaults, or enter something that can be multiplied by 3 to get
+            # to the right number of gaussians, it will just replicate
+            if len(parlist) == 3:
+                parlist *= ngauss
+            elif parlist == params:
+                parlist[:] = [1, 0, 1] * ngauss
+            elif parlist == fixed or parlist == limitedmax:
+                parlist[:] = [False, False, False] * ngauss
+            elif parlist == limitedmin:
+                parlist[:] = [False, False, True] * ngauss
+            elif parlist == minpars or parlist == maxpars:
+                parlist[:] = [0, 0, 0] * ngauss
+
+    def mpfitfun(x, y, err):
+        if err is None:
+            def f(p, fjac=None): return [0, (y-n_gaussian(pars=p)(x))]
+        else:
+            def f(p, fjac=None): return [0, (y-n_gaussian(pars=p)(x))/err]
+        return f
+
+    if xax is None:
+        xax = np.arange(len(data))
+
+    parnames = {0: "AMPLITUDE", 1: "SHIFT", 2: "WIDTH"}
+
+    parinfo = [{'n': ii, 'value': params[ii],
+                'limits': [minpars[ii], maxpars[ii]],
+                'limited': [limitedmin[ii], limitedmax[ii]], 'fixed': fixed[ii],
+                'parname': parnames[ii % 3]+str(ii % 3), 'error': ii}
+               for ii in range(len(params))]
+
+    if veryverbose:
+        print("GUESSES: ")
+        print("\n".join(["%s: %s" % (p['parname'], p['value']) for p in parinfo]))
+
+    mp = mpfit(mpfitfun(xax, data, err), parinfo=parinfo, quiet=quiet)
+    mpp = mp.params
+    mpperr = mp.perror
+    chi2 = mp.fnorm
+
+    if mp.status == 0:
+        raise Exception(mp.errmsg)
+
+    if not shh:
+        print("Final fit values: ")
+        for i, p in enumerate(mpp):
+            parinfo[i]['value'] = p
+            print(parinfo[i]['parname'], p, " +/- ", mpperr[i])
+        print("Chi2: ", mp.fnorm, " Reduced Chi2: ", mp.fnorm/len(data), " DOF:", len(data)-len(mpp))
+
+    return mpp, n_gaussian(pars=mpp)(xax), mpperr, chi2
+
+
+def compute_feature_uncertainty(gposition, gsigma, wave_feat, rms):
+
+    myrange = [gposition-(3. * gsigma), gposition+(3.*gsigma)]
+
+    dl = wave_feat[1] - wave_feat[0]
+    N = (myrange[1]-myrange[0])/dl
+    feature_uncertainty = (rms * np.sqrt(N) * dl * 2)
+
+    return feature_uncertainty
+
+
+def measure_112_RMS(wave, csub):
+    xmin = 11.9
+    xmax = 12.1
+
+    myrange = np.where((wave >= xmin) & (wave <= xmax))
+    csub_mr = csub[myrange]
+    rms = np.sqrt(np.mean(csub_mr**2))
+
+    return rms#, xmin, xmax
+
+
+def fit_aliphatics(basename, wave, flux, fluxerr, rms, output_dir):
+
+    def fit_straight_line(wave, flux, fluxerr):
+
+        # Section 1: Fit Aliphatics
+        lim = np.where((wave>6.6)&(wave<7.65)) # Define wavelength range of relevance
+        waveLim = wave[lim]
+        fluxLim = flux[lim]
+        errLim = fluxerr[lim]
+
+        lim2 = np.where((wave>6.7)&(wave<7.6)) # Region where 7.2 is found
+        waveLim2 = wave[lim2]
+        fluxLim2 = flux[lim2]
+        errLim2  = fluxerr[lim2]
+
+        # Draw a straight line under 7.2 feature
+        # Comment section out if no 7.2
+
+        winDX = np.where((waveLim2 >= 7.) & (waveLim2 <= 7.2)) # Find the first ancor point
+        winWave = waveLim2[winDX]
+        winFlux = fluxLim2[winDX]
+        anchor1Wave = winWave[np.nanargmin(winFlux)]
+        anchor1Flux = np.nanmin(winFlux)
+
+        winDX = np.where((waveLim2 >= 7.5)) # Find the second anchor point 
+        winWave = waveLim2[winDX]
+        winFlux = fluxLim2[winDX]
+        anchor2Wave = winWave[np.nanargmin(winFlux)]
+        anchor2Flux = np.nanmin(winFlux)
+
+        # Define the straight line from the anchor points
+        x = np.array([anchor1Wave, anchor2Wave])
+        y = np.array([anchor1Flux, anchor2Flux])
+        StrLine = np.polyfit(x, y, deg=1) # Fit straight line
+        StrLineFit = StrLine[0]*waveLim2+StrLine[1]
+
+        # Plot straight line to check
+        fig1, ax = plt.subplots()
+        ax.plot(waveLim, fluxLim, '-r',  lw=2) # Make figure
+        ax.errorbar(waveLim, fluxLim, errLim, color='r', ecolor='0.45', lw=2, elinewidth=1)
+        ax.plot(waveLim2, StrLineFit, 'g-', label='7.2 Cont', lw=2)
+        ax.plot(x, y, 'bo')
+
+        ax.legend(loc=0,fontsize='small')
+        ax.set_xlabel('Wavelength (microns)')
+        ax.set_ylabel('Flux (W/m^2)')
+        # ax.set_title(fnameStr + ' -- Line fit')
+        ax.grid()
+        ax.minorticks_on()
+
+        ensure_exists(output_dir)
+        pdf_filename = output_dir + basename + '_aliphatic_fit_1.pdf'
+        print('Saved: ', pdf_filename)
+        fig1.savefig(pdf_filename, format='pdf', bbox_inches='tight')
+
+        plt.close()
+        fig1.clear()
+
+        if StrLine[0]>0: # Subtract straight line from data
+            
+            lim69 = np.where(waveLim<x[0]) # Create limits of subtraction
+            lim72 = np.where((waveLim>=x[0])&(waveLim<=x[1]))
+            limOver = np.where(waveLim>x[1])
+
+            flux69 = fluxLim[lim69]
+            flux72 = fluxLim[lim72] - (StrLine[0]*waveLim[lim72]+StrLine[1]) # Subtraction
+            fluxOver = fluxLim[limOver]
+
+            fluxFull = []
+            fluxFull = np.append(flux69, flux72)
+            fluxFull = np.append(fluxFull, fluxOver) # Create array
+
+        else: 
+            fluxFull = fluxLim  
+
+        return waveLim, fluxFull, errLim
+
+    def fit_gaussians(waveLim, fluxFull, errLim, fnameStr='temp_label'):
+
+        # End of commented section if no 7.2
+        #fluxFull = fluxLim # Comment if spectrum has 7.2 feature
+
+        # Fit Gaussian functions to peaks
+         # Change ngauss and parameters as needed
+        #fitAli = multigaussfit(waveLim, fluxFull, ngauss=2, err=errLim, params=[0.12e-15,6.85,0.1,0.5e-16,7.23,0.05], 
+            #   limitedmin=[True,True,True,True,True,True], limitedmax=[True,True,True,True,True,True],minpars=[0.01e-18,6.8,0.03,0,7,0],
+                #maxpars=[1.5e-14,6.86,0.2,0.5e-15,7.3,0.06])
+        fitAli = multigaussfit(waveLim, fluxFull, ngauss=2, err=errLim, params=[0.2e-14,6.9,0.1,0.17e-14,7.23,0.05],
+                limitedmin=[True,True,True,True,True,True], minpars=[0,6.8,0.04,0,7,0],
+                limitedmax=[True,True,True,True,True,True], maxpars=[0.5e-13,7,0.2,0.1e-13,7.25,0.2]) 
+                
+
+        # Plot fit
+        fig2, ax = plt.subplots() 
+
+        ax.plot(waveLim, fluxFull, '-r', label=fnameStr, lw=2)
+        ax.errorbar(waveLim, fluxFull, errLim, color='r', ecolor='0.45', lw=2, elinewidth=1)
+        ax.plot(waveLim, fitAli[1], '-g', label='Spectral Fit', lw=1.5)
+        ax.fill_between(waveLim, fitAli[1], facecolor='green', alpha=0.15)
+        ax.axhline(y=0,color='k',ls='-',zorder=-10,lw=2)
+
+        ax.legend(loc=0,fontsize='small')
+        ax.set_xlabel('Wavelength (microns)')
+        ax.set_ylabel('Flux (W/m^2)')
+        ax.set_title(fnameStr + ' -- Gaussian Fit')
+        ax.grid()
+        ax.minorticks_on()
+
+        ensure_exists(output_dir)
+        pdf_filename = output_dir + basename + '_aliphatic_fit_2.pdf'
+        print('Saved: ', pdf_filename)
+        fig2.savefig(pdf_filename, format='pdf', bbox_inches='tight')
+
+        plt.close()
+        fig2.clear()
+
+        # print('Fit parameters for aliphatic features:')
+        # print(fitAli[0])
+
+        return fitAli
+
+    def compute_aliphatic_fluxes(fitAli, waveLim, rms):
+
+        # Calculate integrated flux of aliphatic features from fit
+        Gauss69 = fitAli[0][0]*np.exp(-(waveLim - fitAli[0][1])**2/ (2*fitAli[0][2]**2))
+        area69 = simps(Gauss69, waveLim)
+
+        Gauss72 = fitAli[0][3]*np.exp(-(waveLim - fitAli[0][4])**2/ (2*fitAli[0][5]**2))
+        area72 = simps(Gauss72, waveLim)
+
+        err69 = compute_feature_uncertainty(fitAli[0][1], fitAli[0][2], waveLim, rms)
+        err72 = compute_feature_uncertainty(fitAli[0][4], fitAli[0][5], waveLim, rms)
+        #fitErr69 = np.sqrt((fitAli[2][0]/fitAli[0][0])**2 + (fitAli[2][2]/fitAli[0][2])**2) * area69
+        #fitErr72 = np.sqrt((fitAli[2][3]/fitAli[0][3])**2 + (fitAli[2][5]/fitAli[0][5])**2) * area72
+
+        errTot69 = err69 #+ fitErr69
+        errTot72 = err72 #+ fitErr72
+
+        # print('Integrated fluxes of aliphatics:')
+        # print(area69, area72)
+
+        SNR69 = area69/errTot69
+        SNR72 = area72/errTot72
+
+        # print('S/N of aliphatics: ', SNR69, SNR72)
+
+        return area69, err69, SNR69, area72, err72, SNR72
+
+    waveLim, fluxFull, errLim = fit_straight_line(wave, flux, fluxerr)
+
+    fitAli = fit_gaussians(waveLim, fluxFull, errLim, fnameStr='temp_label')
+
+    area69, err69, SNR69, area72, err72, SNR72 = \
+        compute_aliphatic_fluxes(fitAli, waveLim, rms)
+
+    return fitAli, waveLim, area69, SNR69, area72, SNR72
+
+
+def fit_aromatics(basename, wave, flux, fluxerr, rms, output_dir):
+
+    def fit_straight_line(wave, flux, fluxerr, fnameStr='temp_label'): 
+
+        # Section 2: Fit 7.7
+        lim77 = np.where((wave>=6.9)&(wave<=9)) # Limits of feature - change as needed
+        waveLim77 = wave[lim77]
+        fluxLim77 = flux[lim77]
+        errLim77 = fluxerr[lim77]
+
+        lim2_a = np.where((wave>6.9)&(wave<7.45)) # Limit for 7.2 feature - change as needed
+        waveLim2_a = wave[lim2_a]
+        fluxLim2_a = flux[lim2_a]
+        errLim2_a  = fluxerr[lim2_a]
+
+        # Draw a straight line under 7.2 feature
+        # Comment section out if no 7.2
+
+        winDX77 = np.where((waveLim2_a >= 7.) & (waveLim2_a <= 7.2))
+        winWave77 = waveLim2_a[winDX77]
+        winFlux77 = fluxLim2_a[winDX77]
+        anchor1Wave77 = winWave77[np.nanargmin(winFlux77)]
+        anchor1Flux77 = np.nanmin(winFlux77)
+
+        winDX77 = np.where((waveLim2_a >= 7.2))
+        winWave77 = waveLim2_a[winDX77]
+        winFlux77 = fluxLim2_a[winDX77]
+        anchor2Wave77 = winWave77[np.nanargmin(winFlux77)]
+        anchor2Flux77 = np.nanmin(winFlux77)
+
+        # Define the straight line from the anchor points
+        x77 = np.array([anchor1Wave77, anchor2Wave77])
+        y77 = np.array([anchor1Flux77, anchor2Flux77])
+        StrLine77 = np.polyfit(x77, y77, deg=1) # Fit straight line
+        StrLineFit77= StrLine77[0]*waveLim2_a+StrLine77[1]
+
+        # Comment out section if no 7.2
+        fig3, ax = plt.subplots() # Define figure
+        ax.plot(waveLim77, fluxLim77, '-r', label=fnameStr, lw=2)
+        ax.errorbar(waveLim77, fluxLim77, errLim77, color='r', ecolor='0.45', lw=2, elinewidth=1)
+        ax.plot(waveLim2_a, StrLineFit77, 'g-', lw=2) # Plot straight line - comment out if no 7.2 feature
+
+        ax.axhline(y=0,color='k',ls='-',zorder=-10,lw=2)
+        ax.legend(loc=0,fontsize='small')
+        ax.grid()
+        ax.minorticks_on()
+
+        ax.set_title(fnameStr + ' 7.7 complex')
+        ax.set_xlabel('Wavelength (microns)')
+        ax.set_ylabel('Flux (W/m^2)')
+
+        ensure_exists(output_dir)
+        pdf_filename = output_dir + basename + '_aromatic_fit_1.pdf'
+        print('Saved: ', pdf_filename)
+        fig3.savefig(pdf_filename, format='pdf', bbox_inches='tight')
+
+        plt.close()
+        fig3.clear()
+        # End comments if no 7.2
+
+        if StrLine77[0]>0: # Use if spectrum has 7.2
+            lim69_a = np.where(waveLim77<x77[0]) # Create limits of subtraction
+            lim72_a = np.where((waveLim77>=x77[0])&(waveLim77<=x77[1]))
+            limOver_a = np.where(waveLim77>x77[1])
+
+            flux69_a = fluxLim77[lim69_a]
+            flux72_a = (StrLine77[0]*waveLim77[lim72_a]+StrLine77[1]) # Straight Line
+            fluxOver_a = fluxLim77[limOver_a]
+
+            fluxFull77 = []
+            fluxFull77 = np.append(flux69_a, flux72_a)
+            fluxFull77 = np.append(fluxFull77, fluxOver_a) # Create array from wavelength subtraction
+            
+        else:
+            fluxFull77 = fluxLim77 # Use if spectrum has no 7.2
+
+        return waveLim77, fluxLim77, errLim77, fluxFull77
+
+    def fit_gaussians(waveLim77, fluxLim77, errLim77, fluxFull77,
+                      fnameStr='temp_label'):
+
+        # End commented section
+        #fluxFull77 = fluxLim77 # Comment if spectrum has a 7.2 feature
+
+        # Define feature:
+        feature = np.where((waveLim77>7.1)&(waveLim77<8.9)) # Change as needed
+
+        # Fit Gaussian
+        #fit77 = multigaussfit(waveLim77[feature], fluxFull77[feature], ngauss=4, err=errLim77[feature], 
+        #       params=[5e-15,7.5,0.07,5.8e-15,7.75,0.06,1.2e-15,8.1,0.07,1.8e-15,8.65,0.07], 
+        #       limitedmin=[True,True,True,True,True,True,True,True,True,True,True,True],
+         #       limitedmax=[False,True,False,False,True,False,False,True,False,True,True,False],
+          #      minpars=[0,7.4,0.05,0,7.7,0.2e-16,8.1,0.01,0.7e-16,8.4,0.01], 
+           #     maxpars=[3e-14,7.7,0.1,3e-14,8.1,0.2,3e-14,8.4,0.2,3e-14,8.7,0.2])
+        fit77 = multigaussfit(waveLim77[feature], fluxFull77[feature], ngauss=4, err=errLim77[feature], 
+                params=[1.25e-14,7.68,0.1,0.2e-14,7.95,0.06,3e-15,8.227557,0.15,0.3e-14,8.609484,0.08], 
+                limitedmin=[True,True,True,True,True,True,True,True,True,True,True,True],
+                minpars=[0.2e-18,7.5,0.05,0.2e-18,7.75,0.01,0.2e-18,8.1,0.03,0.3e-18,8.5,0], 
+                limitedmax=[True,True,True,True,True,True,False,True,True,True,True,False],
+                maxpars=[2.3e-12,7.9,0.25,1.5e-12,8.2,0.25,8e-12,8.5,0.2,1e-11,8.7,0.12])
+                
+
+
+        # print('Fit parameters of the 7.7 micron complex:')
+        # print(fit77[0])
+        waveArr = np.arange(waveLim77[feature][0],waveLim77[feature][-1], 0.0001)
+        # Seperate Gaussian functions
+        Gauss76  = fit77[0][0]*np.exp(-(waveArr-fit77[0][1])**2 / (2*fit77[0][2]**2))
+        Gauss79  = fit77[0][3]*np.exp(-(waveArr-fit77[0][4])**2/ (2*fit77[0][5]**2))
+        Gauss82 = fit77[0][6]*np.exp(-(waveArr-fit77[0][7])**2/ (2*fit77[0][8]**2))
+        Gauss86 = fit77[0][9]*np.exp(-(waveArr-fit77[0][10])**2/ (2*fit77[0][11]**2))
+
+        #err76 = compute_feature_uncertainty(fit77[0][1], fit77[0][2], waveLim77[feature], rms)
+        #err79 = compute_feature_uncertainty(fit77[0][4], fit77[0][5], waveLim77[feature], rms)
+        #err82 = compute_feature_uncertainty(fit77[0][7], fit77[0][8], waveLim77[feature], rms)
+
+        fluxFeat  = Gauss76 + Gauss79 + Gauss82
+        waveFeat = waveArr
+        area77 = simps(fluxFeat, waveFeat)
+
+        #fitErr77 = np.sqrt((fit77[2][0]/fit77[0][0])**2 + (fit77[2][2]/fit77[0][2])**2 + (fit77[2][3]/fit77[0][3])**2 + (fit77[2][5]/fit77[0][5])**2 +(fit77[2][6]/fit77[0][6])**2 + (fit77[2][8]/fit77[0][8])**2)*area77
+        #errTot77 = fitErr77
+
+        #SNR77 = area77/errTot77
+
+        wave0 = 7.9 # Initial guess for central wavelength
+        errPercent = 1
+        count = 0
+        '''
+        # Define function to calculate difference in blue and red flux
+        def areaEq(wave0):
+            blue = np.where(waveFeat<=wave0) # Integration limits to find central wavelengths
+            red = np.where(waveFeat>wave0)
+            print '**************'
+            area77b = simps(fluxFeat[blue], waveFeat[blue])
+            area77r = simps(fluxFeat[red], waveFeat[red])
+            return area77b - area77r
+
+        lambdaC = fsolve(areaEq, wave0, xtol=1.5E-1) # Optimise difference in blue and red flux to find central wavelength
+        print 'Central wavelength of 7.7 complex'
+        print lambdaC
+
+        while errPercent >= 0.01:
+            count = count + 1
+            #print count
+            blue = np.where(waveFeat<=wave0) # Integration limits to find central wavelengths
+            red = np.where(waveFeat>wave0)
+            area77b = simps(fluxFeat[blue], waveFeat[blue])
+            area77r = simps(fluxFeat[red], waveFeat[red])
+            errPercent = np.absolute((area77b-area77r)/((area77b+area77r)/2))
+            if area77b > area77r:
+                wave0 = wave0 - 0.001
+            elif area77r > area77b:
+                wave0 = wave0 + 0.001
+            else:
+                continue
+            #print area77b, area77r, wave0
+            if count > 1000:
+                break
+            
+        print 'error: ', errPercent
+        print 'count: ', count
+        lambdaC  = wave0
+        print 'Central wavelength of 7.7 complex: ', lambdaC
+
+        blue1 = np.where(waveFeat<=lambdaC)
+        red1 = np.where(waveFeat>lambdaC)
+        area77blue = simps(fluxFeat[blue1], waveFeat[blue1])
+        area77red  = simps(fluxFeat[red1], waveFeat[red1])
+
+        print 'Total integrated flux of 7.7 complex: ', area77
+        #print 'SNR77: ', SNR77
+        print 'Blue flux: ', area77blue
+        print 'Red flux: ', area77red
+        '''
+        # Plot Gaussian fit
+        fig4, ax = plt.subplots() # Define figure
+
+        ax.plot(waveLim77, fluxLim77, '-r', label=fnameStr, lw=2)
+        ax.errorbar(waveLim77, fluxLim77, errLim77, color='r', ecolor='0.45', lw=2, elinewidth=1)
+        ax.plot(waveLim77[feature], fit77[1], '-g', label='Spectral fit', lw=2)
+        #ax.plot(waveLim2_a, StrLineFit77, 'b-', lw=2) # Plot straight line - comment out if no 7.2 feature
+        #ax.plot(x77, y77, 'bo') # Straight line anchor points - comments out if no 7.2 feature
+
+        ax.plot(waveArr, Gauss76, '-g', lw=2) # Overplot individual Gaussian functions
+        ax.fill_between(waveArr, Gauss76, facecolor='green', alpha=0.15)
+        ax.plot(waveArr, Gauss79, '-g', lw=2)
+        ax.fill_between(waveArr, Gauss79, facecolor='green', alpha=0.15)
+        ax.plot(waveArr, Gauss82, '-g', lw=2)
+        ax.fill_between(waveArr, Gauss82, facecolor='green', alpha=0.15)
+        ax.plot(waveArr, Gauss86, '-g', lw=2)
+        ax.fill_between(waveArr, Gauss86, facecolor='green', alpha=0.15)
+
+        #ax.axvline(x=lambdaC, color='black', ls='-', lw=2)
+        ax.axhline(y=0,color='b',ls='-',zorder=-10,lw=2)
+        ax.legend(loc=0,fontsize='small')
+        ax.grid()
+        ax.minorticks_on()
+
+        ax.set_title(fnameStr + ' 7.7 complex - fit')
+        ax.set_xlabel('Wavelength ($\mu m$)')
+        ax.set_ylabel('Flux ($W$/$m^2$)')
+        axes = plt.gca()
+        axes.set_xlim([7.1,9])
+        #axes.set_ylim([0,2e-15])
+
+        ensure_exists(output_dir)
+        pdf_filename = output_dir + basename + '_aromatic_fit_2.pdf'
+        print('Saved: ', pdf_filename)
+        fig4.savefig(pdf_filename, format='pdf', bbox_inches='tight')
+
+        plt.close()
+        fig4.clear()
+
+        return fit77, area77, feature
+
+    waveLim77, fluxLim77, errLim77, fluxFull77 = \
+        fit_straight_line(wave, flux, fluxerr)
+
+    fit77, area77, feature = fit_gaussians(waveLim77, fluxLim77, errLim77, fluxFull77)
+
+    return waveLim77, fit77, area77, feature
+
+
+def measure_112(basename, wave, flux, fluxerr, rms, output_dir,
+                fnameStr='temp_label'):
+
+    lim11 = np.where((wave >= 10.8)&(wave <= 12))
+    waveLim11 = wave[lim11]
+    fluxLim11 = flux[lim11]
+    errLim11 = fluxerr[lim11]
+
+    feature11 = np.where((waveLim11>=11.1)&(waveLim11<=11.85)) # Define actual feature
+    # Start at 11.1, change end point as needed
+
+    area11 = simps(fluxLim11[feature11], waveLim11[feature11]) # Integrate
+
+    # print('Integrated flux of 11.2 feature: ', area11)
+
+    fig5, ax = plt.subplots() # Define figure
+
+    ax.plot(waveLim11, fluxLim11, '-r', label=fnameStr, lw=2)
+    ax.errorbar(waveLim11, fluxLim11, errLim11, color='r', ecolor='0.45', lw=2, elinewidth=1)
+    ax.fill_between(waveLim11[feature11], fluxLim11[feature11], facecolor='red', alpha=0.15)
+    ax.axhline(y=0,color='k',ls='-',zorder=-10,lw=2)
+
+    ax.legend(loc=0,fontsize='small')
+    ax.set_title(fnameStr + ' -- 11.2 feature')
+    ax.set_xlabel('Wavelength (microns)')
+    ax.set_ylabel('Flux (W/m^2)')
+    ax.grid()
+    ax.minorticks_on()
+
+    ensure_exists(output_dir)
+    pdf_filename = output_dir + basename + '_11.pdf'
+    print('Saved: ', pdf_filename)
+    fig5.savefig(pdf_filename, format='pdf', bbox_inches='tight')
+
+    plt.close()
+    fig5.clear()
+
+    return area11
+
+
+def save_fit_parameters(output_dir, results):
+
+    ensure_exists(output_dir)
+
+    fitAli, fit77, basename, waveLim, waveLim77, area69, \
+        area72, area77, area11, SNR69, SNR72, feature = results
+
+    fnameStr = basename
+
+    arrParamsID = np.append(fitAli[0]*0, fit77[0]*0+1) # Save all fit parameters in one file
+    arrParams = np.append(fitAli[0], fit77[0])
+    #arrParamsErr = np.append(fitAli[2], fit77[2])
+
+
+    txt_filename = output_dir + fnameStr + '_fitParams.txt'
+    print('Saved: ', txt_filename)
+    np.savetxt(txt_filename, np.c_[arrParamsID, arrParams], delimiter=',', 
+            header='Gaussian fit parameters\n col1: ID - 0=aliphatic, 1=7.7 complex, col2: parameters, col3: fit error')
+    #np.savetxt(fnameStr + '_fitParams.txt', np.c_[arrParamsID, arrParams, arrParamsErr], delimiter=',', 
+        #   header='Gaussian fit parameters\n col1: ID - 0=aliphatic, 1=7.7 complex, col2: parameters, col3: fit error')
+
+    arrID = np.append(fitAli[1]*0, fit77[1]*0+1) # Save all fit models in one file
+    arrWave = np.append(waveLim, waveLim77[feature])
+    arrFluxDensity = np.append(fitAli[1], fit77[1])
+
+
+    txt_filename = output_dir + fnameStr + '_fitModel.txt'
+    print('Saved: ', txt_filename)
+    np.savetxt(txt_filename, np.c_[arrID, arrWave, arrFluxDensity], delimiter=',',
+            header='Full model fit\n col1: ID - 0=aliphatic, 1=7.7 complex, col2: wavelength, col3: flux density')
+
+    #arrIntegratedFluxes = np.array([area69, area72, area77, area77blue, area77red, area11, lambdaC]) # Save all integrated fluxes in one file
+    arrIntegratedFluxes = np.array([area69, area72, area77, area11]) # Save all integrated fluxes in one file
+
+    txt_filename = output_dir + fnameStr + '_intFlux.txt'
+    print('Saved: ', txt_filename)
+    np.savetxt(txt_filename, np.c_[area69, area72, area77, area11], delimiter=',',
+            header='Integrated fluxes of features\n col1: 6.9 microns, col2: 7.2 microns, col3: total 7.7 complex, col4: blue 7.7, col5: red 7.7, col6: 11.2 feature, col7: central wavelength of 7.7 (microns)')
+
+    txt_filename = output_dir + fnameStr + '_SNR.txt'
+    print('Saved: ', txt_filename)
+    np.savetxt(txt_filename, np.c_[SNR69, SNR72], delimiter=',', header='col1:SNR69, col2: SNR72, col3: SNR77')
+
+    txt_filename = output_dir + fnameStr + 'Full.txt'
+    workFile = open(txt_filename, 'w') # Write all data into single file
+    workFile.write(fnameStr + 'Fitting and integrated flux data\n\n')
+
+    workFile.write('Section 1: Aliphatic features\n')
+    workFile.write('Gaussian fitting parameters for 6.9 and 7.2 micron features\n')
+    workFile.write(str(fitAli[0]) + '\n')
+    workFile.write('Errors on aliphatic fitting parameters\n')
+    workFile.write(str(fitAli[2]) + '\n')
+    workFile.write('Fit model - aliphatic features\n')
+    workFile.write(str(waveLim) + '\n' + str(fitAli[1]) + '\n\n')
+    workFile.write('Integrated fluxes of aliphatic features\n')
+    workFile.write('6.9 micron feature ' + str(area69) + '\n')
+    workFile.write('7.2 micron feature ' + str(area72) + '\n')
+    workFile.write('S/N of 6.9: ' + str(SNR69) + '\n')
+    workFile.write('S/N of 7.2: ' + str(SNR72) + '\n\n')
+
+    workFile.write('Section 2: 7.7 micron complex\n')
+    workFile.write('Gaussian fitting parameters for 7.7 micron complex\n')
+    workFile.write(str(fit77[0]) + '\n')
+    workFile.write('Errors on fitting parameters\n')
+    workFile.write(str(fit77[2]) + '\n')
+    workFile.write('Fit model - 7.7 micron complex\n')
+    workFile.write(str(waveLim77[feature]) + '\n' + str(fit77[1]) + '\n')
+    workFile.write('Integrated fluxes\n')
+    workFile.write('Total integrated flux of complex: ' + str(area77) + '\n')
+    #workFile.write('Blue flux: ' + str(area77blue) + '\n')
+    #workFile.write('Red flux: ' + str(area77red) + '\n')
+    #workFile.write('SNR77: ' + str(SNR77) + '\n')
+    #workFile.write('Central wavelength of 7.7 complex:' + str(lambdaC) + '\n\n')
+
+    workFile.write('Section 3: 11.2 micron feature\n')
+    workFile.write('Integrated flux of 11.2 micron feature:\n')
+    workFile.write(str(area11) + '\n')
+
+    workFile.close()
+    print('Saved: ', txt_filename)
+
+    return

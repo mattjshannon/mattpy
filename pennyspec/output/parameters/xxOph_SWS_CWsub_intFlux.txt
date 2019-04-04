@@ -1,0 +1,3 @@
+# Integrated fluxes of features
+#  col1: 6.9 microns, col2: 7.2 microns, col3: total 7.7 complex, col4: blue 7.7, col5: red 7.7, col6: 11.2 feature, col7: central wavelength of 7.7 (microns)
+1.411589721985236407e-14,4.895123813689561478e-15,9.740965734074911510e-14,1.280743168789350278e-14
