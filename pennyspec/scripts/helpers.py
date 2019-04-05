@@ -9,12 +9,13 @@ from __future__ import print_function
 
 import errno
 import os
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
+from ipdb import set_trace as st
+from scipy.integrate import simps
 
 from scripts.mpfit import mpfit
-from scipy.integrate import simps
-# from scipy.optimize import fsolve
 
 
 def ensure_exists(path):
@@ -334,7 +335,7 @@ def fit_aliphatics(basename, wave, flux, fluxerr, rms, output_dir):
         anchor1Wave = winWave[np.nanargmin(winFlux)]
         anchor1Flux = np.nanmin(winFlux)
 
-        winDX = np.where((waveLim2 >= 7.5)) # Find the second anchor point 
+        winDX = np.where((waveLim2 >= 7.5)) # Find the second anchor point
         winWave = waveLim2[winDX]
         winFlux = fluxLim2[winDX]
         anchor2Wave = winWave[np.nanargmin(winFlux)]
@@ -369,7 +370,7 @@ def fit_aliphatics(basename, wave, flux, fluxerr, rms, output_dir):
         fig1.clear()
 
         if StrLine[0]>0: # Subtract straight line from data
-            
+
             lim69 = np.where(waveLim<x[0]) # Create limits of subtraction
             lim72 = np.where((waveLim>=x[0])&(waveLim<=x[1]))
             limOver = np.where(waveLim>x[1])
@@ -382,8 +383,8 @@ def fit_aliphatics(basename, wave, flux, fluxerr, rms, output_dir):
             fluxFull = np.append(flux69, flux72)
             fluxFull = np.append(fluxFull, fluxOver) # Create array
 
-        else: 
-            fluxFull = fluxLim  
+        else:
+            fluxFull = fluxLim
 
         return waveLim, fluxFull, errLim
 
@@ -394,16 +395,16 @@ def fit_aliphatics(basename, wave, flux, fluxerr, rms, output_dir):
 
         # Fit Gaussian functions to peaks
          # Change ngauss and parameters as needed
-        #fitAli = multigaussfit(waveLim, fluxFull, ngauss=2, err=errLim, params=[0.12e-15,6.85,0.1,0.5e-16,7.23,0.05], 
+        #fitAli = multigaussfit(waveLim, fluxFull, ngauss=2, err=errLim, params=[0.12e-15,6.85,0.1,0.5e-16,7.23,0.05],
             #   limitedmin=[True,True,True,True,True,True], limitedmax=[True,True,True,True,True,True],minpars=[0.01e-18,6.8,0.03,0,7,0],
                 #maxpars=[1.5e-14,6.86,0.2,0.5e-15,7.3,0.06])
         fitAli = multigaussfit(waveLim, fluxFull, ngauss=2, err=errLim, params=[0.2e-14,6.9,0.1,0.17e-14,7.23,0.05],
                 limitedmin=[True,True,True,True,True,True], minpars=[0,6.8,0.04,0,7,0],
-                limitedmax=[True,True,True,True,True,True], maxpars=[0.5e-13,7,0.2,0.1e-13,7.25,0.2]) 
-                
+                limitedmax=[True,True,True,True,True,True], maxpars=[0.5e-13,7,0.2,0.1e-13,7.25,0.2])
+
 
         # Plot fit
-        fig2, ax = plt.subplots() 
+        fig2, ax = plt.subplots()
 
         ax.plot(waveLim, fluxFull, '-r', label=fnameStr, lw=2)
         ax.errorbar(waveLim, fluxFull, errLim, color='r', ecolor='0.45', lw=2, elinewidth=1)
@@ -470,7 +471,7 @@ def fit_aliphatics(basename, wave, flux, fluxerr, rms, output_dir):
 
 def fit_aromatics(basename, wave, flux, fluxerr, rms, output_dir):
 
-    def fit_straight_line(wave, flux, fluxerr, fnameStr='temp_label'): 
+    def fit_straight_line(wave, flux, fluxerr, fnameStr='temp_label'):
 
         # Section 2: Fit 7.7
         lim77 = np.where((wave>=6.9)&(wave<=9)) # Limits of feature - change as needed
@@ -540,7 +541,7 @@ def fit_aromatics(basename, wave, flux, fluxerr, rms, output_dir):
             fluxFull77 = []
             fluxFull77 = np.append(flux69_a, flux72_a)
             fluxFull77 = np.append(fluxFull77, fluxOver_a) # Create array from wavelength subtraction
-            
+
         else:
             fluxFull77 = fluxLim77 # Use if spectrum has no 7.2
 
@@ -556,19 +557,19 @@ def fit_aromatics(basename, wave, flux, fluxerr, rms, output_dir):
         feature = np.where((waveLim77>7.1)&(waveLim77<8.9)) # Change as needed
 
         # Fit Gaussian
-        #fit77 = multigaussfit(waveLim77[feature], fluxFull77[feature], ngauss=4, err=errLim77[feature], 
-        #       params=[5e-15,7.5,0.07,5.8e-15,7.75,0.06,1.2e-15,8.1,0.07,1.8e-15,8.65,0.07], 
+        #fit77 = multigaussfit(waveLim77[feature], fluxFull77[feature], ngauss=4, err=errLim77[feature],
+        #       params=[5e-15,7.5,0.07,5.8e-15,7.75,0.06,1.2e-15,8.1,0.07,1.8e-15,8.65,0.07],
         #       limitedmin=[True,True,True,True,True,True,True,True,True,True,True,True],
          #       limitedmax=[False,True,False,False,True,False,False,True,False,True,True,False],
-          #      minpars=[0,7.4,0.05,0,7.7,0.2e-16,8.1,0.01,0.7e-16,8.4,0.01], 
+          #      minpars=[0,7.4,0.05,0,7.7,0.2e-16,8.1,0.01,0.7e-16,8.4,0.01],
            #     maxpars=[3e-14,7.7,0.1,3e-14,8.1,0.2,3e-14,8.4,0.2,3e-14,8.7,0.2])
-        fit77 = multigaussfit(waveLim77[feature], fluxFull77[feature], ngauss=4, err=errLim77[feature], 
-                params=[1.25e-14,7.68,0.1,0.2e-14,7.95,0.06,3e-15,8.227557,0.15,0.3e-14,8.609484,0.08], 
+        fit77 = multigaussfit(waveLim77[feature], fluxFull77[feature], ngauss=4, err=errLim77[feature],
+                params=[1.25e-14,7.68,0.1,0.2e-14,7.95,0.06,3e-15,8.227557,0.15,0.3e-14,8.609484,0.08],
                 limitedmin=[True,True,True,True,True,True,True,True,True,True,True,True],
-                minpars=[0.2e-18,7.5,0.05,0.2e-18,7.75,0.01,0.2e-18,8.1,0.03,0.3e-18,8.5,0], 
+                minpars=[0.2e-18,7.5,0.05,0.2e-18,7.75,0.01,0.2e-18,8.1,0.03,0.3e-18,8.5,0],
                 limitedmax=[True,True,True,True,True,True,False,True,True,True,True,False],
                 maxpars=[2.3e-12,7.9,0.25,1.5e-12,8.2,0.25,8e-12,8.5,0.2,1e-11,8.7,0.12])
-                
+
 
 
         # print('Fit parameters of the 7.7 micron complex:')
@@ -627,7 +628,7 @@ def fit_aromatics(basename, wave, flux, fluxerr, rms, output_dir):
             #print area77b, area77r, wave0
             if count > 1000:
                 break
-            
+
         print 'error: ', errPercent
         print 'count: ', count
         lambdaC  = wave0
@@ -692,6 +693,122 @@ def fit_aromatics(basename, wave, flux, fluxerr, rms, output_dir):
     return waveLim77, fit77, area77, feature
 
 
+def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
+    """Fit Gaussians and straight line at the same time or something. Or maybe
+    no straight line."""
+    def fit_4gauss_2lines(wave, flux, fluxerr, trim, trim_wide):
+
+        # Multigauss fit. Intensity, center, sigma (or FWHM?).
+        yscale = flux[trim]
+        guess = np.nanmax(yscale)
+        yfit = multigaussfit(wave[trim], flux[trim], ngauss=4, err=fluxerr[trim],
+            params=[
+                # 0.2e-14,  6.90, 0.10,
+                # 0.2e-14,  7.23, 0.05,
+                guess / 2.,  7.68, 0.10,
+                guess,  7.95, 0.06,
+                guess / 2.,  8.23, 0.15,
+                guess / 2.,  8.61, 0.08
+            ],
+            limitedmin=[True] * 12,
+            limitedmax=[True] * 12,
+            minpars=[
+                # 0, 6.8, 0.04,
+                # 0, 7, 0,
+                0, 7.5, 0.05,
+                0, 7.75, 0.01,
+                0, 8.1, 0.03,
+                0, 8.5, 0
+            ],
+            maxpars=[
+                # 0.5e-13, 7, 0.2,
+                # 0.1e-13, 7.25, 0.2,
+                guess, 7.9, 0.25,
+                guess, 8.2, 0.25,
+                guess, 8.5, 0.2,
+                guess, 8.7, 0.12
+            ])
+
+        g76 = onedgaussian(wave, 0, yfit[0][0], yfit[0][1], yfit[0][2])
+        g78 = onedgaussian(wave, 0, yfit[0][3], yfit[0][4], yfit[0][5])
+        g82 = onedgaussian(wave, 0, yfit[0][6], yfit[0][7], yfit[0][8])
+        g86 = onedgaussian(wave, 0, yfit[0][9], yfit[0][10], yfit[0][11])
+        model = g76 + g78 + g82 + g86
+
+        # Multigauss fit. Intensity, center, sigma (or FWHM?).
+        resid = flux - model
+        yfit2 = multigaussfit(wave, resid, ngauss=2,
+            params=[
+                np.nanmax(resid) / 2.,  6.90, 0.10,
+                np.nanmax(resid) / 2.,  7.23, 0.05,
+            ],
+            limitedmin=[True] * 6,
+            limitedmax=[True] * 6,
+            minpars=[
+                0, 6.8, 0.04,
+                0, 7, 0,
+            ],
+            maxpars=[
+                np.nanmax(resid), 7, 0.2,
+                np.nanmax(resid), 7.25, 0.2,
+            ])
+
+        line69 = onedgaussian(wave, 0, yfit2[0][0], yfit2[0][1], yfit2[0][2])
+        line72 = onedgaussian(wave, 0, yfit2[0][3], yfit2[0][4], yfit2[0][5])
+
+        return g76, g78, g82, g86, line69, line72, model, yfit, yfit2
+
+    print(basename)
+
+    # Only fit 7-9 micron zone.
+    trim = np.where((wave > 7.3) & (wave < 9.2))
+    trim_wide = np.where((wave >= 6.0) & (wave <= 10))
+
+    # Return fit.
+    g76, g78, g82, g86, line69, line72, model, yfit, yfit2 = \
+        fit_4gauss_2lines(wave, flux, fluxerr, trim, trim_wide)
+
+    flux69 = simps(line69, wave)
+    flux72 = simps(line72, wave)
+
+
+    # Plot results.
+    fig = plt.figure()
+    gs = gridspec.GridSpec(ncols=1, nrows=2, figure=fig, hspace=0.3)
+    ax1 = plt.subplot(gs[0])
+    ax2 = plt.subplot(gs[1])
+
+    # Upper panel.
+    ax1.plot(wave[trim_wide], flux[trim_wide], label='Data')
+    ax1.plot(wave[trim_wide], model[trim_wide], label='Model (Flux: {:.0e} W/m^2)'.format(simps(model, wave)))
+    plot_labels = ['g76', 'g78', 'g82', 'g86']
+    for index, item in enumerate((g76, g78, g82, g86)):
+        ax1.fill_between(wave[trim_wide], wave[trim_wide] * 0, item[trim_wide],
+                         lw=0.5, alpha=0.3)
+    ax1.axhline(y=0, ls='--', lw=0.5, color='k')
+    ax1.legend(loc=0)
+    xmin, xmax = ax1.get_xlim()
+
+    # Lower panel.
+    trim_wide2 = np.where((wave >= 6.5) & (wave <= 10))
+    ax2.plot(wave[trim_wide2], flux[trim_wide2] - model[trim_wide2], label='Residual from 4gauss')
+    # ax2.plot(wave, yfit2[1], label='2 lines')
+    ax2.fill_between(wave, wave * 0, line69, label='6.9 aliphatic (Flux: {:.0e} W/m^2)'.format(flux69), alpha=0.3)
+    ax2.fill_between(wave, wave * 0, line72, label='7.2 aliphatic (Flux: {:.0e} W/m^2)'.format(flux72), alpha=0.3)
+    ax2.axhline(y=0, ls='--', lw=0.5, color='k')
+    ax2.legend(loc=0)
+    ax2.set_xlim(xmin, xmax)
+
+    # Save.
+    savename = output_dir + basename + '_test.pdf'
+    fig.savefig(savename, bbox_inches='tight')
+    print('Saved: ', savename)
+    plt.close()
+    fig.clear()
+
+    return
+
+
 def measure_112(basename, wave, flux, fluxerr, rms, output_dir,
                 fnameStr='temp_label'):
 
@@ -748,9 +865,9 @@ def save_fit_parameters(output_dir, results):
 
     txt_filename = output_dir + fnameStr + '_fitParams.txt'
     print('Saved: ', txt_filename)
-    np.savetxt(txt_filename, np.c_[arrParamsID, arrParams], delimiter=',', 
+    np.savetxt(txt_filename, np.c_[arrParamsID, arrParams], delimiter=',',
             header='Gaussian fit parameters\n col1: ID - 0=aliphatic, 1=7.7 complex, col2: parameters, col3: fit error')
-    #np.savetxt(fnameStr + '_fitParams.txt', np.c_[arrParamsID, arrParams, arrParamsErr], delimiter=',', 
+    #np.savetxt(fnameStr + '_fitParams.txt', np.c_[arrParamsID, arrParams, arrParamsErr], delimiter=',',
         #   header='Gaussian fit parameters\n col1: ID - 0=aliphatic, 1=7.7 complex, col2: parameters, col3: fit error')
 
     arrID = np.append(fitAli[1]*0, fit77[1]*0+1) # Save all fit models in one file

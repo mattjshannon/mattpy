@@ -9,6 +9,7 @@ import glob
 import numpy as np
 
 from scripts.spectrum import Spectrum
+from scripts.spectrum_full import FullSpectrum
 
 # Load data:
 data_dir = 'input/'
@@ -18,8 +19,13 @@ file_list = np.sort(glob.glob(data_dir + '*_CWsub.txt'))
 # Iterate over each spectrum and produce plots/fit parameters:
 for index, filename in enumerate(file_list):
 
-    spectrum = Spectrum(filename=filename, is_Windows=True)
-    spectrum.plot_spectrum(output_dir=output_dir + 'spectra/', units='si')
-    spectrum.fit_aliphatics(output_dir=output_dir + 'diagnostics/')
-    spectrum.fit_aromatics(output_dir=output_dir + 'diagnostics/')
-    spectrum.save_results(output_dir=output_dir + 'parameters/')
+    # spectrum = Spectrum(filename=filename, is_Windows=False)
+    # spectrum.plot_spectrum(output_dir=output_dir + 'spectra/', units='si')
+    # spectrum.fit_aliphatics(output_dir=output_dir + 'diagnostics/')
+    # spectrum.fit_aromatics(output_dir=output_dir + 'diagnostics/')
+    # spectrum.save_results(output_dir=output_dir + 'parameters/')
+
+    fullspec = FullSpectrum(filename=filename)
+    fullspec.measure_all_bands(output_dir=output_dir + 'fullspec/')
+
+    # raise SystemExit("Early exit for testing.")
