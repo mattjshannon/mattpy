@@ -18,6 +18,8 @@ file_list = np.sort(glob.glob(data_dir + '*_CWsub.txt'))
 
 # Iterate over each spectrum and produce plots/fit parameters:
 for index, filename in enumerate(file_list):
+    # if index != 9:
+    #     continue
 
     # spectrum = Spectrum(filename=filename, is_Windows=False)
     # spectrum.plot_spectrum(output_dir=output_dir + 'spectra/', units='si')

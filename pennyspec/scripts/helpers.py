@@ -739,7 +739,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         resid = flux - model
         yfit2 = multigaussfit(wave, resid, ngauss=2,
             params=[
-                np.nanmax(resid) / 2.,  6.90, 0.10,
+                np.nanmax(resid) / 2.,  6.88, 0.10,
                 np.nanmax(resid) / 2.,  7.23, 0.05,
             ],
             limitedmin=[True] * 6,
@@ -750,62 +750,190 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
             ],
             maxpars=[
                 np.nanmax(resid), 7, 0.2,
-                np.nanmax(resid), 7.25, 0.2,
+                np.nanmax(resid), 7.30, 0.2,
             ])
 
         line69 = onedgaussian(wave, 0, yfit2[0][0], yfit2[0][1], yfit2[0][2])
         line72 = onedgaussian(wave, 0, yfit2[0][3], yfit2[0][4], yfit2[0][5])
 
-        return g76, g78, g82, g86, line69, line72, model, yfit, yfit2
+        wpeak = {
+            '69': yfit2[0][1],
+            '72': yfit2[0][4],
+        }
+
+
+        return g76, g78, g82, g86, line69, line72, model, yfit, yfit2, wpeak
+
+    def fit_6gauss(wave, flux, fluxerr, trim):
+
+        # Multigauss fit. Intensity, center, sigma (or FWHM?).
+        yscale = flux[trim]
+        guess = np.nanmax(yscale)
+        yfit = multigaussfit(wave[trim], flux[trim], ngauss=6, err=fluxerr[trim],
+            params=[
+                guess / 2.,  6.89, 0.10,
+                guess / 2.,  7.23, 0.05,
+                guess / 2.,  7.68, 0.10,
+                guess,       7.95, 0.06,
+                guess / 2.,  8.23, 0.15,
+                guess / 2.,  8.61, 0.08,
+            ],
+            limitedmin=[True] * 18,
+            limitedmax=[True] * 18,
+            minpars=[
+                0, 6.8, 0.04,
+                0, 7.0, 0,
+                0, 7.5, 0.05,
+                0, 7.75, 0.01,
+                0, 8.1, 0.03,
+                0, 8.5, 0,
+            ],
+            maxpars=[
+                guess, 7.0, 0.2,
+                guess, 7.30, 0.2,
+                guess, 7.9, 0.25,
+                guess, 8.2, 0.25,
+                guess, 8.5, 0.2,
+                guess, 8.7, 0.12,
+            ])
+
+        # Save results.
+        features = ('line69', 'line72', 'g76', 'g78', 'g82', 'g86')
+        keys = ('scale_factor', 'position', 'sigma')
+        results = {}
+
+        for i in range(6):
+            fit_params = (yfit[0][3*i:3*i+3])
+            results[features[i]] = dict(zip(keys, fit_params))
+            results[features[i]]['wave'] = wave
+            results[features[i]]['spectrum'] = onedgaussian(wave, 0, *fit_params)
+            results[features[i]]['integrated_flux'] = \
+                simps(results[features[i]]['spectrum'], results[features[i]]['wave'])
+
+        return yfit, results
 
     print(basename)
 
-    # Only fit 7-9 micron zone.
-    trim = np.where((wave > 7.3) & (wave < 9.2))
-    trim_wide = np.where((wave >= 6.0) & (wave <= 10))
+    fit4 = False
 
-    # Return fit.
-    g76, g78, g82, g86, line69, line72, model, yfit, yfit2 = \
-        fit_4gauss_2lines(wave, flux, fluxerr, trim, trim_wide)
+    if fit4 == True:
 
-    flux69 = simps(line69, wave)
-    flux72 = simps(line72, wave)
+        # Only fit 7-9 micron zone.
+        trim = np.where((wave > 7.3) & (wave < 9.2))
+        trim_wide = np.where((wave >= 6.0) & (wave <= 10))
+
+        # Return fit.
+        g76, g78, g82, g86, line69, line72, model, yfit, yfit2, wpeak = \
+            fit_4gauss_2lines(wave, flux, fluxerr, trim, trim_wide)
+
+        flux69 = simps(line69, wave)
+        flux72 = simps(line72, wave)
 
 
-    # Plot results.
-    fig = plt.figure()
-    gs = gridspec.GridSpec(ncols=1, nrows=2, figure=fig, hspace=0.3)
-    ax1 = plt.subplot(gs[0])
-    ax2 = plt.subplot(gs[1])
+        # feat77 = g76 + g78 + g82
+        # tot_area = simps(feat77, wave)
 
-    # Upper panel.
-    ax1.plot(wave[trim_wide], flux[trim_wide], label='Data')
-    ax1.plot(wave[trim_wide], model[trim_wide], label='Model (Flux: {:.0e} W/m^2)'.format(simps(model, wave)))
-    plot_labels = ['g76', 'g78', 'g82', 'g86']
-    for index, item in enumerate((g76, g78, g82, g86)):
-        ax1.fill_between(wave[trim_wide], wave[trim_wide] * 0, item[trim_wide],
-                         lw=0.5, alpha=0.3)
-    ax1.axhline(y=0, ls='--', lw=0.5, color='k')
-    ax1.legend(loc=0)
-    xmin, xmax = ax1.get_xlim()
+        # for index, value in enumerate(feat77):
+        #     if index == 0:
+        #         continue
+        #     area = simps(feat77[:index], wave[:index])
+        #     if area >= 0.5 * tot_area:
+        #         print(index)
+        #         st()
 
-    # Lower panel.
-    trim_wide2 = np.where((wave >= 6.5) & (wave <= 10))
-    ax2.plot(wave[trim_wide2], flux[trim_wide2] - model[trim_wide2], label='Residual from 4gauss')
-    # ax2.plot(wave, yfit2[1], label='2 lines')
-    ax2.fill_between(wave, wave * 0, line69, label='6.9 aliphatic (Flux: {:.0e} W/m^2)'.format(flux69), alpha=0.3)
-    ax2.fill_between(wave, wave * 0, line72, label='7.2 aliphatic (Flux: {:.0e} W/m^2)'.format(flux72), alpha=0.3)
-    ax2.axhline(y=0, ls='--', lw=0.5, color='k')
-    ax2.legend(loc=0)
-    ax2.set_xlim(xmin, xmax)
+        # Plot results.
+        fig = plt.figure()
+        gs = gridspec.GridSpec(ncols=1, nrows=2, figure=fig, hspace=0.3)
+        ax1 = plt.subplot(gs[0])
+        ax2 = plt.subplot(gs[1])
 
-    # Save.
-    savename = output_dir + basename + '_test.pdf'
-    fig.savefig(savename, bbox_inches='tight')
-    print('Saved: ', savename)
-    plt.close()
-    fig.clear()
+        # Upper panel.
+        ax1.plot(wave[trim_wide], flux[trim_wide], label='Data')
+        ax1.plot(wave[trim_wide], model[trim_wide],
+            label='Model (Flux: {:.2e} W/m^2)'.format(simps(g76 + g78 + g82, wave)))
+        plot_labels = ['g76', 'g78', 'g82', 'g86']
+        for index, item in enumerate((g76, g78, g82, g86)):
+            ax1.fill_between(wave[trim_wide], wave[trim_wide] * 0, item[trim_wide],
+                             lw=0.5, alpha=0.3)
+        ax1.axhline(y=0, ls='--', lw=0.5, color='k')
+        ax1.legend(loc=0)
+        xmin, xmax = ax1.get_xlim()
 
+        # Lower panel.
+        trim_wide2 = np.where((wave >= 6.5) & (wave <= 10))
+        ax2.plot(wave[trim_wide2], flux[trim_wide2] - model[trim_wide2], label='Residual from 4gauss')
+        # ax2.plot(wave, yfit2[1], label='2 lines')
+        ax2.fill_between(wave, wave * 0, line69, alpha=0.3,
+            label='6.9 ({:.2f} µm, Flux: {:.2e} W/m^2)'.format(wpeak['69'], flux69))
+        ax2.fill_between(wave, wave * 0, line72, alpha=0.3,
+            label='7.2 ({:.2f} µm, Flux: {:.2e} W/m^2)'.format(wpeak['72'], flux72))
+        ax2.axhline(y=0, ls='--', lw=0.5, color='k')
+        ax2.legend(loc=0)
+        ax2.set_xlim(xmin, xmax)
+
+        # Save.
+        savename = output_dir + basename + '_test.pdf'
+        fig.savefig(savename, bbox_inches='tight')
+        print('Saved: ', savename)
+        plt.close()
+        fig.clear()
+
+    else:
+
+        # Only fit 7-9 micron zone.
+        trim = np.where((wave > 6.0) & (wave < 10))
+
+        # Try 6-components.
+        yfit, results = fit_6gauss(wave, flux, fluxerr, trim)
+
+        # flux69 = simps(line69, wave)
+        # flux72 = simps(line72, wave)
+
+        # Plot results.
+        fig = plt.figure(figsize=(8, 6))
+        gs = gridspec.GridSpec(ncols=1, nrows=2, figure=fig, hspace=0.3)
+        ax1 = plt.subplot(gs[0])
+        ax2 = plt.subplot(gs[1])
+
+        # Upper panel.
+        flux77 = sum([results[x]['integrated_flux'] for x in ('g76', 'g78', 'g82')])
+        spec77 = results['g76']['spectrum'] + results['g78']['spectrum'] + \
+            results['g82']['spectrum']
+        centroid77 = np.sum(spec77 * wave) / np.sum(spec77)
+
+        ax1.plot(wave[trim], flux[trim], label='Data')
+        ax1.plot(wave[trim], yfit[1],
+                 label=r'Model (g1-3: {:.2f} µm, {:.2e} W/m$^2$)'.format(centroid77, flux77))
+        for index, key in enumerate(results):
+            ax1.fill_between(wave[trim], wave[trim] * 0,
+                             results[key]['spectrum'][trim],
+                             lw=0.5, alpha=0.3)
+        ax1.axvline(x=centroid77, color='k', ls='-', lw=0.5)
+        ax1.axhline(y=0, ls='--', lw=0.5, color='k')
+        ax1.legend(loc=0, fontsize=8)
+        xmin, xmax = ax1.get_xlim()
+
+        # Lower panel.
+        ax2.plot(wave[trim], flux[trim] - yfit[1], label='Residuals')
+        ax2.axvline(x=6.9, color='k', ls='-', lw=0.5)
+        ax2.axvline(x=7.25, color='k', ls='-', lw=0.5)
+        for index, key in enumerate(results):
+            line = results[key]
+            label='{:.2f} µm, {:.2e} W/m^2, sigma={:.2f} µm'.format(
+                line['position'], line['integrated_flux'], line['sigma']
+                )
+            ax2.fill_between(wave[trim], wave[trim] * 0,
+                             results[key]['spectrum'][trim],
+                             lw=0.5, alpha=0.3, label=label)
+        ax1.axhline(y=0, ls='--', lw=0.5, color='k')
+        ax2.legend(loc=0, fontsize=8)
+
+        # Save.
+        savename = output_dir + basename + '_6gauss.pdf'
+        fig.savefig(savename, bbox_inches='tight')
+        print('Saved: ', savename)
+        plt.close()
+        fig.clear()
     return
 
 
