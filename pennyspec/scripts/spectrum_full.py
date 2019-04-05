@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: <encoding name> -*-
 """
 spectrum.py
@@ -9,26 +9,23 @@ Matt J. Shannon
 Nov. 2018
 """
 
-from __future__ import print_function
-
-import matplotlib.pyplot as plt
 import numpy as np
 
 import scripts.helpers as helpers
 
 
-class FullSpectrum(object):
+class FullSpectrum:
     """Wrap up a spectrum for analysis."""
 
-    def __init__(self, filename, is_Windows=False):
+    def __init__(self, filename, is_windows=False):
         self.filename = filename
-        self.is_Windows = is_Windows
+        self.is_windows = is_windows
         self.__set_basename()
         self.__load_data()
 
     def __set_basename(self):
         """Extract the raw filename, minus the extension."""
-        if self.is_Windows:
+        if self.is_windows:
             split_char = '\\'
         else:
             split_char = '/'
@@ -50,5 +47,4 @@ class FullSpectrum(object):
         wrap = (self.basename, self.wave, self.flux_si,
                 self.fluxerr_si, self.rms, output_dir)
         results = helpers.fit_all(*wrap)
-
-        # raise SystemExit("do something here with the results.")
+        print(results.keys())

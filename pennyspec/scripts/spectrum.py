@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: <encoding name> -*-
 """
 spectrum.py
@@ -9,15 +9,13 @@ Matt J. Shannon
 Nov. 2018
 """
 
-from __future__ import print_function
-
 import matplotlib.pyplot as plt
 import numpy as np
 
 import scripts.helpers as helpers
 
 
-class Spectrum(object):
+class Spectrum:
     """Wrap up a spectrum for analysis."""
 
     def __init__(self, filename, is_Windows=False):
@@ -32,9 +30,9 @@ class Spectrum(object):
             split_char = '\\'
         else:
             split_char = '/'
-        
+
         self.basename = self.filename.split(split_char)[-1].split('.txt')[0]
-        
+
     def __load_data(self):
         # Load spectrum (in units of Jy).
         wave, flux, fluxerr = np.loadtxt(self.filename, delimiter=',').T

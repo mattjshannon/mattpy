@@ -12,22 +12,19 @@ from scripts.spectrum import Spectrum
 from scripts.spectrum_full import FullSpectrum
 
 # Load data:
-data_dir = 'input/'
-output_dir = 'output/'
-file_list = np.sort(glob.glob(data_dir + '*_CWsub.txt'))
+DATA_DIR = 'input/'
+OUTPUT_DIR = 'output/'
+FILE_LIST = np.sort(glob.glob(DATA_DIR + '*_CWsub.txt'))
 
 # Iterate over each spectrum and produce plots/fit parameters:
-for index, filename in enumerate(file_list):
-    # if index != 9:
-    #     continue
+for index, filename in enumerate(FILE_LIST):
 
-    # spectrum = Spectrum(filename=filename, is_Windows=False)
-    # spectrum.plot_spectrum(output_dir=output_dir + 'spectra/', units='si')
-    # spectrum.fit_aliphatics(output_dir=output_dir + 'diagnostics/')
-    # spectrum.fit_aromatics(output_dir=output_dir + 'diagnostics/')
-    # spectrum.save_results(output_dir=output_dir + 'parameters/')
+    spectrum = Spectrum(filename=filename, is_Windows=False)
+    spectrum.plot_spectrum(output_dir=OUTPUT_DIR + 'spectra/', units='si')
+    spectrum.fit_aliphatics(output_dir=OUTPUT_DIR + 'diagnostics/')
+    spectrum.fit_aromatics(output_dir=OUTPUT_DIR + 'diagnostics/')
+    spectrum.save_results(output_dir=OUTPUT_DIR + 'parameters/')
 
     fullspec = FullSpectrum(filename=filename)
-    fullspec.measure_all_bands(output_dir=output_dir + 'fullspec/')
-
-    # raise SystemExit("Early exit for testing.")
+    fullspec.measure_all_bands(output_dir=OUTPUT_DIR + 'fullspec/')
+    # TODO: save model results if we're going that way.
