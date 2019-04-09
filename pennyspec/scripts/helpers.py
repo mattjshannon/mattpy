@@ -12,6 +12,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import simps
 
+from ipdb import set_trace as st
+
+from mattpy.utils import to_sigma, to_fwhm
 from scripts.mpfit import mpfit
 
 
@@ -874,6 +877,50 @@ def fit_aromatics(basename, wave, flux, fluxerr, rms, output_dir):
 def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
     """Fit Gaussians and straight line at the same time or something. Or maybe
     no straight line."""
+    def param_constraints_OK(p0, line, index):
+        # Test if any parameter hitting min/max of constrained range.
+
+        def nums_equal(num1, num2, acc=0.01):
+            """Returns True if numbers are equal within some accuracy."""
+            if np.abs(num1 - num2)  < acc:
+                return False
+            else:
+                return True
+
+        # Line position.
+        pindex = index * 3 + 1
+        fixed_position = p0['fixed'][pindex]
+
+        if not fixed_position:
+            limited_min = p0['limitedmin'][pindex]
+            limited_max = p0['limitedmax'][pindex]
+            if limited_min:
+                if not nums_equal(p0['minpars'][pindex], line['position']):
+                    print('Hitting minimum line position.')
+                    return False
+            if limited_max:
+                if not nums_equal(p0['maxpars'][pindex], line['position']):
+                    print('Hitting maximum line position.')
+                    return False
+
+        # Line sigma.
+        pindex = index * 3 + 2
+        fixed_sigma = p0['fixed'][pindex]
+
+        if not fixed_sigma:
+            limited_min = p0['limitedmin'][pindex]
+            limited_max = p0['limitedmax'][pindex]
+            if limited_min:
+                if not nums_equal(p0['minpars'][pindex], line['sigma']):
+                    print('Hitting minimum line sigma.')
+                    return False
+            if limited_max:
+                if not nums_equal(p0['maxpars'][pindex], line['sigma']):
+                    print('Hitting maximum line sigma.')
+                    return False
+
+        return True
+
     def fit_4gauss_2lines(wave, flux, fluxerr, trim, trim_wide):
 
         # Multigauss fit. Intensity, center, sigma (or FWHM?).
@@ -945,37 +992,60 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
 
     def fit_6gauss(wave, flux, fluxerr, trim):
 
-        # Multigauss fit. Intensity, center, sigma (or FWHM?).
+        # Initial parameters and constraints.
         yscale = flux[trim]
         guess = np.nanmax(yscale)
-        yfit = multigaussfit(
-            wave[trim], flux[trim], ngauss=6, err=fluxerr[trim],
-            params=[
+        p0 = {
+            'params':
+                [
                 guess / 2.,  6.89, 0.10,
                 guess / 2.,  7.23, 0.05,
-                guess / 2.,  7.68, 0.10,
-                guess,       7.95, 0.06,
-                guess / 2.,  8.23, 0.15,
-                guess / 2.,  8.61, 0.08,
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
             ],
-            limitedmin=[True] * 18,
-            limitedmax=[True] * 18,
-            minpars=[
-                0, 6.8, 0.04,
-                0, 7.0, 0,
-                0, 7.5, 0.05,
-                0, 7.75, 0.01,
-                0, 8.1, 0.03,
-                0, 8.5, 0,
+            'limitedmin': [True] * 18,
+            'limitedmax': [True] * 18,
+            'fixed':
+                [
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            False, False, False,
             ],
-            maxpars=[
+            'minpars':
+                [
+                0, 6.8,  0.04,
+                0, 7.0,  0,
+                0, 7.45,  to_sigma(0.315),
+                0, 7.77,  to_sigma(0.275),
+                0, 8.15,  to_sigma(0.165),
+                0, 8.49,  to_sigma(0.235),
+            ],
+            'maxpars':
+                [
                 guess, 7.0, 0.2,
-                guess, 7.30, 0.2,
-                guess, 7.9, 0.25,
-                guess, 8.2, 0.25,
-                guess, 8.5, 0.2,
-                guess, 8.7, 0.12,
-            ])
+                guess, 7.3, 0.2,
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+        }
+
+        # Multigauss fit. Intensity, center, sigma (or FWHM?).
+        yfit = multigaussfit(
+            wave[trim], flux[trim], ngauss=6, err=fluxerr[trim],
+            params=p0['params'],
+            limitedmin=p0['limitedmin'],
+            limitedmax=p0['limitedmax'],
+            fixed=p0['fixed'],
+            minpars=p0['minpars'],
+            maxpars=p0['maxpars']
+            )
 
         # Save results.
         features = ('line69', 'line72', 'g76', 'g78', 'g82', 'g86')
@@ -991,7 +1061,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
             results[features[i]]['integrated_flux'] = simps(
                 results[features[i]]['spectrum'], results[features[i]]['wave'])
 
-        return yfit, results
+        return yfit, results, p0
 
     print(basename)
 
@@ -1062,7 +1132,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         trim = np.where((wave > 6.0) & (wave < 10))
 
         # Try 6-components.
-        yfit, results = fit_6gauss(wave, flux, fluxerr, trim)
+        yfit, results, p0 = fit_6gauss(wave, flux, fluxerr, trim)
 
         # Plot results.
         fig = plt.figure(figsize=(8, 6))
@@ -1076,7 +1146,6 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         spec77 = results['g76']['spectrum'] + results['g78']['spectrum'] + \
             results['g82']['spectrum']
         centroid77 = np.sum(spec77 * wave) / np.sum(spec77)
-
         model_label = \
             r'Model (g1-3: {:.2f} µm, {:.2e} W/m$^2$)'.format(centroid77,
                                                               flux77)
@@ -1095,16 +1164,24 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         ax2.plot(wave[trim], flux[trim] - yfit[1], label='Residuals')
         ax2.axvline(x=6.9, color='k', ls='-', lw=0.5)
         ax2.axvline(x=7.25, color='k', ls='-', lw=0.5)
+
+        param_OK_list = [True]
         for index, key in enumerate(results):
             line = results[key]
-            label = '{:.2f} µm, {:.2e} W/m^2, sigma={:.2f} µm'.format(
-                line['position'], line['integrated_flux'], line['sigma']
+            label = '{:.2f} µm, {:.2e} W/m^2, FWHM={:.2f} µm'.format(
+                line['position'], line['integrated_flux'],
+                to_fwhm(line['sigma'])
             )
+            param_OK_list.append(param_constraints_OK(p0, line, index))
             ax2.fill_between(wave[trim], wave[trim] * 0,
                              results[key]['spectrum'][trim],
                              lw=0.5, alpha=0.3, label=label)
-        ax1.axhline(y=0, ls='--', lw=0.5, color='k')
-        ax2.legend(loc=0, fontsize=8)
+        ax2.axhline(y=0, ls='--', lw=0.5, color='k')
+        mylegend = ax2.legend(loc=0, fontsize=8)
+
+        for index, text in enumerate(mylegend.get_texts()):
+            if not param_OK_list[index]:
+                text.set_color("red")
 
         # Save.
         savename = output_dir + basename + '_6gauss.pdf'
@@ -1112,6 +1189,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         print('Saved: ', savename)
         plt.close()
         fig.clear()
+
     return
 
 

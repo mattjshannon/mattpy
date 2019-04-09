@@ -11,6 +11,11 @@ Notes:
 
     Stock et al. 2017:
     Allow peak to vary within 0.2 µm window, FWHM to vary within 0.25µm window.
+    Fixed ones, averages:
+    7.55 (0.44 fwhm)
+    7.87 (0.40 fwhm)
+    8.25 (0.29 fwhm)
+    8.59 (0.36 fwhm)
 
 """
 
@@ -28,11 +33,11 @@ FILE_LIST = np.sort(glob.glob(DATA_DIR + '*_CWsub.txt'))
 # Iterate over each spectrum and produce plots/fit parameters:
 for index, filename in enumerate(FILE_LIST):
 
-    spectrum = Spectrum(filename=filename, is_Windows=False)
-    spectrum.plot_spectrum(output_dir=OUTPUT_DIR + 'spectra/', units='si')
-    spectrum.fit_aliphatics(output_dir=OUTPUT_DIR + 'diagnostics/')
-    spectrum.fit_aromatics(output_dir=OUTPUT_DIR + 'diagnostics/')
-    spectrum.save_results(output_dir=OUTPUT_DIR + 'parameters/')
+    # spectrum = Spectrum(filename=filename, is_Windows=False)
+    # spectrum.plot_spectrum(output_dir=OUTPUT_DIR + 'spectra/', units='si')
+    # spectrum.fit_aliphatics(output_dir=OUTPUT_DIR + 'diagnostics/')
+    # spectrum.fit_aromatics(output_dir=OUTPUT_DIR + 'diagnostics/')
+    # spectrum.save_results(output_dir=OUTPUT_DIR + 'parameters/')
 
     fullspec = FullSpectrum(filename=filename)
     fullspec.measure_all_bands(output_dir=OUTPUT_DIR + 'fullspec/')

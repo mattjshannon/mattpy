@@ -47,4 +47,3 @@ class FullSpectrum:
         wrap = (self.basename, self.wave, self.flux_si,
                 self.fluxerr_si, self.rms, output_dir)
         results = helpers.fit_all(*wrap)
-        print(results.keys())
