@@ -3,6 +3,15 @@
 analyze_pahs.py
 
 Measure the aliphatic and aromatic features in Spitzer IRS spectra.
+
+Notes:
+    Peeters et al. 2017:
+    "λ (FWHM) of 7.59 (0.450), 7.93 (0.300), 8.25 (0.270), and 8.58 (0.344) μm"
+    Allow to vary... doesn't say how much .
+
+    Stock et al. 2017:
+    Allow peak to vary within 0.2 µm window, FWHM to vary within 0.25µm window.
+
 """
 
 import glob
