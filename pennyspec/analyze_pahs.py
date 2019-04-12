@@ -28,7 +28,7 @@ from scripts.spectrum_full import FullSpectrum
 # Load data:
 DATA_DIR = 'input/'
 OUTPUT_DIR = 'output/'
-FILE_LIST = np.sort(glob.glob(DATA_DIR + '*_CWsub.txt'))
+FILE_LIST = np.sort(glob.glob(DATA_DIR + '*CWsub.txt'))
 
 # Iterate over each spectrum and produce plots/fit parameters:
 for index, filename in enumerate(FILE_LIST):
