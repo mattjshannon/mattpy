@@ -14,7 +14,7 @@ from scipy.integrate import simps
 
 from ipdb import set_trace as st
 
-from mattpy.utils import to_sigma, to_fwhm
+from mattpy.utils import to_sigma, to_fwhm, quant_str
 from scripts.mpfit import mpfit
 
 
@@ -998,8 +998,8 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         p0 = {
             'params':
                 [
-                guess / 2.,  6.89, 0.10,
-                guess / 2.,  7.23, 0.05,
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 2.,  7.25, to_sigma(0.12),
                 guess / 2.,  7.55, to_sigma(0.44),
                 guess / 1.,  7.87, to_sigma(0.40),
                 guess / 2.,  8.25, to_sigma(0.29),
@@ -1018,17 +1018,17 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
             ],
             'minpars':
                 [
-                0, 6.8,  0.04,
-                0, 7.0,  0,
-                0, 7.45,  to_sigma(0.315),
-                0, 7.77,  to_sigma(0.275),
-                0, 8.15,  to_sigma(0.165),
-                0, 8.49,  to_sigma(0.235),
+                guess / 30., 6.82,  to_sigma(0.06),
+                0,           7.15,  to_sigma(0.05),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                0,           8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
             ],
             'maxpars':
                 [
-                guess, 7.0, 0.2,
-                guess, 7.3, 0.2,
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.30, to_sigma(0.15),
                 guess, 7.65, to_sigma(0.565),
                 guess, 7.97, to_sigma(0.525),
                 guess, 8.35, to_sigma(0.415),
@@ -1036,9 +1036,15 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
             ]
         }
 
+        # If fluxerr[trim] has zeroes, don't use errors for now?
+        if 0 in fluxerr[trim]:
+            errpass = None
+        else:
+            errpass = fluxerr[trim]
+
         # Multigauss fit. Intensity, center, sigma (or FWHM?).
         yfit = multigaussfit(
-            wave[trim], flux[trim], ngauss=6, err=fluxerr[trim],
+            wave[trim], flux[trim], ngauss=6, err=errpass,
             params=p0['params'],
             limitedmin=p0['limitedmin'],
             limitedmax=p0['limitedmax'],
@@ -1140,16 +1146,23 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         ax1 = plt.subplot(gs[0])
         ax2 = plt.subplot(gs[1])
 
+        ##############################
         # Upper panel.
+        ##############################
+
         flux77 = sum([results[x]['integrated_flux']
                       for x in ('g76', 'g78', 'g82')])
         spec77 = results['g76']['spectrum'] + results['g78']['spectrum'] + \
             results['g82']['spectrum']
+
         centroid77 = np.sum(spec77 * wave) / np.sum(spec77)
         model_label = \
             r'Model (g1-3: {:.2f} µm, {:.2e} W/m$^2$)'.format(centroid77,
                                                               flux77)
-        ax1.plot(wave[trim], flux[trim], label='Data')
+
+        ax1.errorbar(wave[trim], flux[trim], yerr=fluxerr[trim], label='Data')
+        # ax1.plot(wave[trim], flux[trim], label='Data')
+
         ax1.plot(wave[trim], yfit[1], label=model_label)
         for index, key in enumerate(results):
             ax1.fill_between(wave[trim], wave[trim] * 0,
@@ -1160,8 +1173,13 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         ax1.legend(loc=0, fontsize=8)
         xmin, xmax = ax1.get_xlim()
 
+        ##############################
         # Lower panel.
-        ax2.plot(wave[trim], flux[trim] - yfit[1], label='Residuals')
+        ##############################
+
+        f72_69 = results['line72']['integrated_flux'] / results['line69']['integrated_flux']
+
+        ax2.plot(wave[trim], flux[trim] - yfit[1], label='Residuals (7.2/6.9 = {})'.format(quant_str(f72_69, precision="0.01")))
         ax2.axvline(x=6.9, color='k', ls='-', lw=0.5)
         ax2.axvline(x=7.25, color='k', ls='-', lw=0.5)
 
