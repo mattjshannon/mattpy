@@ -13,6 +13,7 @@ import numpy as np
 from scipy.integrate import simps
 
 from ipdb import set_trace as st
+from lmfit import Minimizer, Parameters, report_fit
 
 from mattpy.utils import to_sigma, to_fwhm, quant_str
 from scripts.mpfit import mpfit
@@ -323,6 +324,138 @@ def compute_feature_uncertainty(gposition, gsigma, wave_feat, rms):
     feature_uncertainty = (rms * np.sqrt(N) * dl * 2)
 
     return feature_uncertainty
+
+
+def params_6gauss(basename, guess):
+
+    p0 = {
+        'params':
+            [
+            guess / 2.,  6.89, to_sigma(0.15),
+            guess / 4.,  7.25, to_sigma(0.12),
+            guess / 2.,  7.55, to_sigma(0.44),
+            guess / 1.,  7.87, to_sigma(0.40),
+            guess / 2.,  8.25, to_sigma(0.29),
+            guess / 2.,  8.59, to_sigma(0.36),
+        ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        ],
+        'minpars':
+            [
+            guess / 30., 6.82,  to_sigma(0.06),
+            0,           7.15,  to_sigma(0.05),
+            0,           7.45,  to_sigma(0.315),
+            0,           7.77,  to_sigma(0.275),
+            0,           8.15,  to_sigma(0.165),
+            0,           8.49,  to_sigma(0.235),
+        ],
+        'maxpars':
+            [
+            guess, 6.96, to_sigma(0.21),
+            guess, 7.35, to_sigma(0.15),
+            guess, 7.65, to_sigma(0.565),
+            guess, 7.97, to_sigma(0.525),
+            guess, 8.35, to_sigma(0.415),
+            guess, 8.69, to_sigma(0.485),
+        ]
+    }
+
+    p1 = {
+        'params':
+            [
+            guess / 2.,  6.89, to_sigma(0.15),
+            guess / 4.,  7.25, to_sigma(0.12),
+            guess / 2.,  7.55, to_sigma(0.44),
+            guess / 1.,  7.87, to_sigma(0.40),
+            guess / 2.,  8.25, to_sigma(0.29),
+            guess / 2.,  8.59, to_sigma(0.36),
+        ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        ],
+        'minpars':
+            [
+            guess / 30., 6.82,  to_sigma(0.06),
+            guess / 40., 7.15,  to_sigma(0.05),
+            guess / 30., 7.45,  to_sigma(0.315),
+            guess / 30., 7.77,  to_sigma(0.275),
+            0,           8.15,  to_sigma(0.165),
+            guess / 30., 8.49,  to_sigma(0.235),
+        ],
+        'maxpars':
+            [
+            guess, 6.96, to_sigma(0.21),
+            guess, 7.35, to_sigma(0.15),
+            guess, 7.65, to_sigma(0.565),
+            guess, 7.97, to_sigma(0.525),
+            guess, 8.35, to_sigma(0.415),
+            guess, 8.69, to_sigma(0.485),
+        ]
+    }
+
+    param_dict = {
+        'hd97048_convCWsub': p0,
+        'hd135344_convCWsub': p0,
+        'IRAS05063_CWsub': p1,
+        'IRAS05092_CWsub': p0,
+        'IRAS05186_CWsub': p0,
+        'IRAS05361_CWsub': p0,
+        'IRAS05370_CWsub': p1,
+        'IRAS05413_CWsub': p1,
+        'IRAS05588_CWsub': p0,
+        'IRAS06111_CWsub': p0,
+        'IRAS14429_CWsub': p0,
+        'IRAS15482_CWsub': p1,
+        'iras17047_SWS_CWsub': p1,
+        'IRASF05110-6616_LR_CWsub': p0,
+        'IRASf05192_CWsub': p1,
+        'J004441_CWsub': p0,
+        'J010546_CWsub': p1,
+        'j050713_CWsub': p1,
+        'J052043_CWsub': p1,
+        'J052520_CWsub': p1,
+        'NGC1978WBT2665_CWsub': p1,
+        'SMPLMC076_CWsub': p1,
+        'SMPSMC006_CWsub': p1,
+        'SMPSMC011_CWsub': p1,
+    }
+
+    # pos, flux, sigma = line69_params[basename]
+    # amp = flux / (np.sqrt(2) * np.abs(sigma) * np.sqrt(np.pi))
+
+    # max_flux72 = 0.35 * flux
+    # amp_72_approx = max_flux72 / (np.sqrt(2) * np.abs(sigma) * np.sqrt(np.pi))
+
+
+    # p0['params'][0] = amp
+    # p0['params'][1] = pos
+    # p0['params'][2] = sigma
+
+    # p0['fixed'][0] = True
+    # p0['fixed'][1] = True
+    # p0['fixed'][2] = True
+
+    # p0['maxpars'][3] = amp_72_approx
+    # p0['params'][3] = amp_72_approx * 0.5
+
+    return p0
 
 
 def measure_112_RMS(wave, csub):
@@ -990,51 +1123,12 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
 
         return g76, g78, g82, g86, line69, line72, model, yfit, yfit2, wpeak
 
-    def fit_6gauss(wave, flux, fluxerr, trim):
+    def fit_6gauss(wave, flux, fluxerr, trim, basename):
 
         # Initial parameters and constraints.
         yscale = flux[trim]
         guess = np.nanmax(yscale)
-        p0 = {
-            'params':
-                [
-                guess / 2.,  6.89, to_sigma(0.15),
-                guess / 2.,  7.25, to_sigma(0.12),
-                guess / 2.,  7.55, to_sigma(0.44),
-                guess / 1.,  7.87, to_sigma(0.40),
-                guess / 2.,  8.25, to_sigma(0.29),
-                guess / 2.,  8.59, to_sigma(0.36),
-            ],
-            'limitedmin': [True] * 18,
-            'limitedmax': [True] * 18,
-            'fixed':
-                [
-            False, False, False,
-            False, False, False,
-            False, False, False,
-            False, False, False,
-            False, False, False,
-            False, False, False,
-            ],
-            'minpars':
-                [
-                guess / 30., 6.82,  to_sigma(0.06),
-                0,           7.15,  to_sigma(0.05),
-                guess / 30., 7.45,  to_sigma(0.315),
-                guess / 30., 7.77,  to_sigma(0.275),
-                0,           8.15,  to_sigma(0.165),
-                guess / 30., 8.49,  to_sigma(0.235),
-            ],
-            'maxpars':
-                [
-                guess, 6.96, to_sigma(0.21),
-                guess, 7.30, to_sigma(0.15),
-                guess, 7.65, to_sigma(0.565),
-                guess, 7.97, to_sigma(0.525),
-                guess, 8.35, to_sigma(0.415),
-                guess, 8.69, to_sigma(0.485),
-            ]
-        }
+        p0 = params_6gauss(basename, guess)
 
         # If fluxerr[trim] has zeroes, don't use errors for now?
         if 0 in fluxerr[trim]:
@@ -1068,6 +1162,124 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
                 results[features[i]]['spectrum'], results[features[i]]['wave'])
 
         return yfit, results, p0
+
+    def fit_6gauss_lmfit(wave, flux, fluxerr, trim):
+
+        # define objective function: returns the array to be minimized
+        def fcn2min(params, x, data):
+            """Model a decaying sine wave and subtract data."""
+            amp1 = params['amp1']
+            amp2 = params['amp2']
+            amp3 = params['amp3']
+            amp4 = params['amp4']
+            amp5 = params['amp5']
+            amp6 = params['amp6']
+
+            pos1 = params['pos1']
+            pos2 = params['pos2']
+            pos3 = params['pos3']
+            pos4 = params['pos4']
+            pos5 = params['pos5']
+            pos6 = params['pos6']
+
+            fwhm1 = params['fwhm1']
+            fwhm2 = params['fwhm2']
+            fwhm3 = params['fwhm3']
+            fwhm4 = params['fwhm4']
+            fwhm5 = params['fwhm5']
+            fwhm6 = params['fwhm6']
+
+            model1 = amp1 * np.exp(-(x - pos1)**2 / (2.0 * to_sigma(fwhm1)**2))
+            model2 = amp2 * np.exp(-(x - pos2)**2 / (2.0 * to_sigma(fwhm2)**2))
+            model3 = amp3 * np.exp(-(x - pos3)**2 / (2.0 * to_sigma(fwhm3)**2))
+            model4 = amp4 * np.exp(-(x - pos4)**2 / (2.0 * to_sigma(fwhm4)**2))
+            model5 = amp5 * np.exp(-(x - pos5)**2 / (2.0 * to_sigma(fwhm5)**2))
+            model6 = amp6 * np.exp(-(x - pos6)**2 / (2.0 * to_sigma(fwhm6)**2))
+
+            model = model1 + model2 + model3 + model4 + model5 + model6
+
+            return model - data
+
+        # Initial parameters and constraints.
+        yscale = flux[trim]
+        scale_fac = np.nanmedian(yscale)
+
+        # Scale to be near unity for computational reasons?
+        x = wave[trim]
+        data = flux[trim] / scale_fac
+
+        # Guess for parameters.
+        gg = np.nanmax(data)
+
+        # create a set of Parameters
+        params = Parameters()
+        params.add('amp1', value=gg/2., max=gg, min=gg/30.)
+        params.add('amp2', value=gg/2., max=gg, min=0)
+        params.add('amp3', value=gg/2., max=gg, min=gg/30.)
+        params.add('amp4', value=gg/1., max=gg, min=gg/30.)
+        params.add('amp5', value=gg/2., max=gg, min=0)
+        params.add('amp6', value=gg/2., max=gg, min=gg/30.)
+
+        params.add('pos1', value=6.89, min=6.82, max=6.96)
+        params.add('pos2', value=7.25, min=7.15, max=7.30)
+        params.add('pos3', value=7.55, min=7.45, max=7.65)
+        params.add('pos4', value=7.87, min=7.77, max=7.97)
+        params.add('pos5', value=8.25, min=8.15, max=8.35)
+        params.add('pos6', value=8.59, min=8.49, max=8.69)
+
+        params.add('fwhm1', value=0.15, min=0.060, max=0.21)
+        params.add('fwhm2', value=0.12, min=0.050, max=0.15)
+        params.add('fwhm3', value=0.44, min=0.315, max=0.565)
+        params.add('fwhm4', value=0.40, min=0.275, max=0.525)
+        params.add('fwhm5', value=0.29, min=0.165, max=0.415)
+        params.add('fwhm6', value=0.36, min=0.235, max=0.485)
+
+        # do fit, here with leastsq model
+        minner = Minimizer(fcn2min, params, fcn_args=(x, data))
+        result = minner.minimize()
+
+        # calculate final result
+        final = data + result.residual
+
+        # write error report
+        report_fit(result)
+
+        # plt.plot(x, data, 'k+')
+        # plt.plot(x, final, 'r')
+        # plt.show()
+
+        # # If fluxerr[trim] has zeroes, don't use errors for now?
+        # if 0 in fluxerr[trim]:
+        #     errpass = None
+        # else:
+        #     errpass = fluxerr[trim]
+
+        # # Multigauss fit. Intensity, center, sigma (or FWHM?).
+        # yfit = multigaussfit(
+        #     wave[trim], flux[trim], ngauss=6, err=errpass,
+        #     params=p0['params'],
+        #     limitedmin=p0['limitedmin'],
+        #     limitedmax=p0['limitedmax'],
+        #     fixed=p0['fixed'],
+        #     minpars=p0['minpars'],
+        #     maxpars=p0['maxpars']
+        #     )
+
+        # # Save results.
+        # features = ('line69', 'line72', 'g76', 'g78', 'g82', 'g86')
+        # keys = ('scale_factor', 'position', 'sigma')
+        # results = {}
+
+        # for i in range(6):
+        #     fit_params = (yfit[0][3 * i:3 * i + 3])
+        #     results[features[i]] = dict(zip(keys, fit_params))
+        #     results[features[i]]['wave'] = wave
+        #     results[features[i]]['spectrum'] = onedgaussian(
+        #         wave, 0, *fit_params)
+        #     results[features[i]]['integrated_flux'] = simps(
+        #         results[features[i]]['spectrum'], results[features[i]]['wave'])
+
+        return None, None, None
 
     print(basename)
 
@@ -1138,7 +1350,11 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         trim = np.where((wave > 6.0) & (wave < 10))
 
         # Try 6-components.
-        yfit, results, p0 = fit_6gauss(wave, flux, fluxerr, trim)
+        yfit, results, p0 = fit_6gauss(wave, flux, fluxerr, trim, basename)
+
+        # # Try 6, with LMFIT!
+        # yfit2, results2, p02 = fit_6gauss_lmfit(wave, flux, fluxerr, trim)
+        # st()
 
         # Plot results.
         fig = plt.figure(figsize=(8, 6))

@@ -26,10 +26,10 @@ from scripts.spectrum import Spectrum
 from scripts.spectrum_full import FullSpectrum
 
 # Load data:
-DATA_DIR = 'input/'
-# DATA_DIR = 'input_table2/'
-OUTPUT_DIR = 'output/'
-# OUTPUT_DIR = 'output_table2/'
+# DATA_DIR = 'input/'
+DATA_DIR = 'input_table2/'
+# OUTPUT_DIR = 'output/'
+OUTPUT_DIR = 'output_table2/'
 FILE_LIST = np.sort(glob.glob(DATA_DIR + '*CWsub.txt'))
 
 # Iterate over each spectrum and produce plots/fit parameters:
@@ -46,5 +46,3 @@ for index, filename in enumerate(FILE_LIST):
     fullspec = FullSpectrum(filename=filename)
     fullspec.measure_all_bands(output_dir=OUTPUT_DIR + 'fullspec/')
     # TODO: save model results if we're going that way.
-
-    print(index, filename)
