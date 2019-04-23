@@ -34,7 +34,9 @@ FILE_LIST = np.sort(glob.glob(DATA_DIR + '*CWsub.txt'))
 
 # Iterate over each spectrum and produce plots/fit parameters:
 for index, filename in enumerate(FILE_LIST):
-    # if index not in [53]:
+    # print(index, filename)
+
+    # if index not in [18]:
     #     continue
 
     # spectrum = Spectrum(filename=filename, is_Windows=False)
