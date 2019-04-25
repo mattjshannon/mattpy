@@ -10,10 +10,11 @@ import os
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.integrate import simps
+import pickle
 
 from ipdb import set_trace as st
-from lmfit import Minimizer, Parameters, report_fit
+from scipy.integrate import simps
+# from lmfit import Minimizer, Parameters, report_fit
 
 from mattpy.utils import to_sigma, to_fwhm, quant_str
 from scripts.mpfit import mpfit
@@ -738,9 +739,50 @@ def params_6gauss(basename, guess):
         ]
     }
 
+    p10 = {
+        'params':
+            [
+            guess / 2.,  6.89, to_sigma(0.15),
+            guess / 4.,  7.25, to_sigma(0.12),
+            guess / 2.,  7.55, to_sigma(0.44),
+            guess / 1.,  7.87, to_sigma(0.40),
+            guess / 2.,  8.25, to_sigma(0.29),
+            guess / 2.,  8.59, to_sigma(0.36),
+        ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [False] * 18,
+        'fixed':
+            [
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        False, False, False,
+        ],
+        'minpars':
+            [
+            guess / 30., 6.82,  to_sigma(0.06),
+            guess / 40., 7.22,  to_sigma(0.07),
+            guess / 30., 7.45,  to_sigma(0.315),
+            guess / 30., 7.77,  to_sigma(0.275),
+            0,           8.15,  to_sigma(0.165),
+            guess / 30., 8.49,  to_sigma(0.235),
+        ],
+        'maxpars':
+            [
+            guess, 6.96, to_sigma(0.16),
+            guess, 7.32, to_sigma(0.15),
+            guess, 7.65, to_sigma(0.6),
+            guess, 7.97, to_sigma(0.525),
+            guess, 8.35, to_sigma(0.415),
+            guess, 8.69, to_sigma(0.485),
+        ]
+    }
+
     param_dict = {
         'hd97048_convCWsub': p0,            # GOOD, wouldn't trust 72 tho
-        'hd135344_convCWsub': p0,           #
+        'hd135344_convCWsub': p0,           # * NO ALIPHATICS TRUSTED!!! *
         'IRAS05063_CWsub': p3,              # GOOD
         'IRAS05092_CWsub': p0,              # GOOD
         'IRAS05186_CWsub': p0,              # GOOD
@@ -751,7 +793,7 @@ def params_6gauss(basename, guess):
         'IRAS06111_CWsub': p0,              # GOOD
         'IRAS14429_CWsub': p0,              # GOOD
         'IRAS15482_CWsub': p5,              # GOOD, don't trust 7.2 maybe (manual)
-        'iras17047_SWS_CWsub': p1,          #
+        'iras17047_SWS_CWsub': p10,         # GOOD, had to do ct myself
         'IRASF05110-6616_LR_CWsub': p0,     # GOOD
         'IRASf05192_CWsub': p1,             # GOOD, quesitonable 69/72. tho
         'J004441_CWsub': p0,                # GOOD
@@ -760,7 +802,7 @@ def params_6gauss(basename, guess):
         'J052043_CWsub': p8,                # GOOD, had to drop errors (not fitting?)
         'J052520_CWsub': p1,                # GOOD
         'NGC1978WBT2665_CWsub': p1,         # GOOD
-        'SMPLMC076_CWsub': p1,              #
+        'SMPLMC076_CWsub': p1,              # new
         'SMPSMC006_CWsub': p9,              # GOOD, dropping fluxerr in fit (!!)
         'SMPSMC011_CWsub': p1,              # GOOD
     }
@@ -1674,7 +1716,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         ax2.set_xlim(xmin, xmax)
 
         # Save.
-        savename = output_dir + basename + '_test.pdf'
+        savename = output_dir + 'fullspec/' + basename + '_test.pdf'
         fig.savefig(savename, bbox_inches='tight')
         print('Saved: ', savename)
         plt.close()
@@ -1711,17 +1753,18 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         model_label = \
             r'Model (g1-3: {:.2f} µm, {:.2e} W/m$^2$)'.format(centroid77,
                                                               flux77)
-
         ax1.errorbar(wave[trim], flux[trim], yerr=fluxerr[trim], label='Data')
         # ax1.plot(wave[trim], flux[trim], label='Data')
 
-        ax1.plot(wave[trim], yfit[1], label=model_label)
+        ax1.plot(wave[trim], yfit[1], label=model_label, zorder=1000)
         for index, key in enumerate(results):
             ax1.fill_between(wave[trim], wave[trim] * 0,
                              results[key]['spectrum'][trim],
                              lw=0.5, alpha=0.3)
         ax1.axvline(x=centroid77, color='k', ls='-', lw=0.5)
         ax1.axhline(y=0, ls='--', lw=0.5, color='k')
+        ax1.axvline(x=6.9, color='k', ls='-', lw=0.5)
+        ax1.axvline(x=7.25, color='k', ls='-', lw=0.5)      
         ax1.legend(loc=0, fontsize=8)
         xmin, xmax = ax1.get_xlim()
 
@@ -1754,11 +1797,24 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
                 text.set_color("red")
 
         # Save.
-        savename = output_dir + basename + '_6gauss.pdf'
+        savename = output_dir + 'fullspec/' + basename + '_6gauss.pdf'
         fig.savefig(savename, bbox_inches='tight')
         print('Saved: ', savename)
         plt.close()
         fig.clear()
+
+
+        # Insert the 7.7 results.
+        results['pah77'] = {
+            'flux': flux77,
+            'centroid': centroid77,
+        }
+
+        pkl_name = output_dir + 'numeric/' + basename + '.pkl'
+        # Record results to disk.
+        with open(pkl_name, 'wb') as file:
+            pickle.dump(results, file, protocol=pickle.HIGHEST_PROTOCOL)
+            print('Saved: ', pkl_name)
 
     return
 

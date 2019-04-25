@@ -34,9 +34,9 @@ FILE_LIST = np.sort(glob.glob(DATA_DIR + '*CWsub.txt'))
 
 # Iterate over each spectrum and produce plots/fit parameters:
 for index, filename in enumerate(FILE_LIST):
-    # print(index, filename)
+    print(index, filename)
 
-    # if index not in [18]:
+    # if index not in [22]:
     #     continue
 
     # spectrum = Spectrum(filename=filename, is_Windows=False)
@@ -46,5 +46,5 @@ for index, filename in enumerate(FILE_LIST):
     # spectrum.save_results(output_dir=OUTPUT_DIR + 'parameters/')
 
     fullspec = FullSpectrum(filename=filename)
-    fullspec.measure_all_bands(output_dir=OUTPUT_DIR + 'fullspec/')
+    fullspec.measure_all_bands(output_dir=OUTPUT_DIR)
     # TODO: save model results if we're going that way.
