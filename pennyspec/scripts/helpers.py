@@ -7,14 +7,15 @@ Helpers functions for analyze_pahs.py
 
 import errno
 import os
+import pickle
+
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
-
+from gaussfitter import onedgaussian, onedgaussfit, n_gaussian, \
+    multigaussfit
 from ipdb import set_trace as st
 from scipy.integrate import simps
-# from lmfit import Minimizer, Parameters, report_fit
 
 from mattpy.utils import to_sigma, to_fwhm, quant_str
 from scripts.mpfit import mpfit
@@ -59,261 +60,6 @@ def smooth(x, window_len=50, window='hanning'):
     y = np.convolve(w / w.sum(), s, mode='same')
 
     return y[window_len:-window_len + 1]
-
-
-def onedgaussian(x, H, A, dx, w):
-    """
-    Returns a 1-dimensional gaussian of form
-    H+A*np.exp(-(x-dx)**2/(2*w**2))
-    """
-    return H + A * np.exp(-(x - dx)**2 / (2 * w**2))
-
-
-def onedgaussfit(xax, data, err=None,
-                 params=[0, 1, 0, 1], fixed=[False, False, False, False],
-                 limitedmin=[False, False, False, True],
-                 limitedmax=[False, False, False, False],
-                 minpars=[0, 0, 0, 0], maxpars=[0, 0, 0, 0],
-                 quiet=True, shh=True, veryverbose=False,
-                 vheight=True, negamp=False, usemoments=False):
-    """
-    Parameters
-    ----------
-    xax : np.array
-        x axis
-    data : np.array
-        y axis
-    err : np.array
-        error corresponding to data
-    params : tuple
-        Fit parameters: Height of background, Amplitude, Shift, Width
-    fixed : bool
-        Is parameter fixed?
-    limitedmin/minpars : tuple
-        set lower limits on each parameter (default: width>0)
-    limitedmax/maxpars : tuple
-        set upper limits on each parameter
-    quiet : bool
-        should MPFIT output each iteration?
-    shh : bool
-        output final parameters?
-    usemoments : bool
-        replace default parameters with moments
-    Returns
-    -------
-    Fit parameters
-    Model
-    Fit errors
-    chi2
-    """
-
-    def mpfitfun(x, y, err):
-        if err is None:
-            def f(p, fjac=None): return [0, (y - onedgaussian(x, *p))]
-        else:
-            def f(p, fjac=None): return [0, (y - onedgaussian(x, *p)) / err]
-        return f
-
-    if xax is None:
-        xax = np.arange(len(data))
-
-    if not vheight:
-        # height = params[0]
-        fixed[0] = True
-    # if usemoments:
-    #     params = onedmoments(
-    #         xax,
-    #         data,
-    #         vheight=vheight,
-    #         negamp=negamp,
-    #         veryverbose=veryverbose)
-    #     if vheight is False:
-    #         params = [height] + params
-    #     if veryverbose:
-    #         print("OneD moments: h: %g  a: %g  c: %g  w: %g" % tuple(params))
-
-    parinfo = [{'n': 0, 'value': params[0], 'limits': [minpars[0], maxpars[0]],
-                'limited': [limitedmin[0], limitedmax[0]], 'fixed': fixed[0],
-                'parname': "HEIGHT", 'error': 0},
-               {'n': 1, 'value': params[1], 'limits': [minpars[1], maxpars[1]],
-                'limited': [limitedmin[1], limitedmax[1]], 'fixed': fixed[1],
-                'parname': "AMPLITUDE", 'error': 0},
-               {'n': 2, 'value': params[2], 'limits': [minpars[2], maxpars[2]],
-                'limited': [limitedmin[2], limitedmax[2]], 'fixed': fixed[2],
-                'parname': "SHIFT", 'error': 0},
-               {'n': 3, 'value': params[3], 'limits': [minpars[3], maxpars[3]],
-                'limited': [limitedmin[3], limitedmax[3]], 'fixed': fixed[3],
-                'parname': "WIDTH", 'error': 0}]
-
-    mp = mpfit(mpfitfun(xax, data, err), parinfo=parinfo, quiet=quiet)
-    mpp = mp.params
-    mpperr = mp.perror
-    chi2 = mp.fnorm
-
-    if mp.status == 0:
-        raise Exception(mp.errmsg)
-
-    if (not shh) or veryverbose:
-        print("Fit status: ", mp.status)
-        for i, p in enumerate(mpp):
-            parinfo[i]['value'] = p
-            print(parinfo[i]['parname'], p, " +/- ", mpperr[i])
-        print(
-            "Chi2: ",
-            mp.fnorm,
-            " Reduced Chi2: ",
-            mp.fnorm /
-            len(data),
-            " DOF:",
-            len(data) -
-            len(mpp))
-
-    return mpp, onedgaussian(xax, *mpp), mpperr, chi2
-
-
-def n_gaussian(pars=None, a=None, dx=None, sigma=None):
-    """
-    Returns a function that sums over N gaussians, where N is the length of
-    a,dx,sigma *OR* N = len(pars) / 3
-    The background "height" is assumed to be zero (you must "baseline" your
-    spectrum before fitting)
-    pars  - a list with len(pars) = 3n, assuming a,dx,sigma repeated
-    dx    - offset (velocity center) values
-    sigma - line widths
-    a     - amplitudes
-    """
-    if len(pars) % 3 == 0:
-        a = [pars[ii] for ii in range(0, len(pars), 3)]
-        dx = [pars[ii] for ii in range(1, len(pars), 3)]
-        sigma = [pars[ii] for ii in range(2, len(pars), 3)]
-    elif not(len(dx) == len(sigma) == len(a)):
-        raise ValueError("Wrong array lengths! dx: %i  sigma: %i  a: %i" %
-                         (len(dx), len(sigma), len(a)))
-
-    def g(x):
-        v = np.zeros(len(x))
-        for i in range(len(dx)):
-            v += a[i] * np.exp(-(x - dx[i])**2 / (2.0 * sigma[i]**2))
-        return v
-    return g
-
-
-def multigaussfit(xax, data, ngauss=1, err=None, params=[1, 0, 1],
-                  fixed=[False, False, False], limitedmin=[False, False, True],
-                  limitedmax=[False, False, False], minpars=[0, 0, 0],
-                  maxpars=[0, 0, 0],
-                  quiet=True, shh=True, veryverbose=False):
-    """
-    An improvement on onedgaussfit.  Lets you fit multiple gaussians.
-    Parameters
-    ----------
-    xax : np.array
-      x axis
-    data : np.array
-      y axis
-    err : np.array or None
-      error corresponding to data
-    ngauss : int
-      How many gaussians to fit?  Default 1 (this could supersede
-      onedgaussfit). Parameters below need to have lenght of 3*ngauss. If
-      ``ngauss``>1 and their lenght is 3, they will be replicated ngaus
-      times, otherwise they will be reset to defaults.
-    params : list
-      Fit parameters: [amplitude, offset, width] * ngauss
-      If len(params) % 3 == 0, ngauss will be set to len(params) / 3
-    fixed : list of bools
-      Is parameter fixed?
-    limitedmin/minpars : list
-      set lower limits on each parameter (default: width>0)
-    limitedmax/maxpars : list
-      set upper limits on each parameter
-    minpars : list
-    maxpars : list
-    quiet : bool
-      should MPFIT output each iteration?
-    shh : bool
-      output final parameters?
-    veryverbose : bool
-    Returns
-    -------
-    Fit parameters
-    Model
-    Fit errors
-    chi2
-    """
-
-    if len(params) != ngauss and (len(params) // 3) > ngauss:
-        ngauss = len(params) // 3
-
-    if isinstance(params, np.ndarray):
-        params = params.tolist()
-
-    # make sure all various things are the right length; if they're not, fix
-    # them using the defaults
-    for parlist in (params, fixed, limitedmin, limitedmax, minpars, maxpars):
-        if len(parlist) != 3 * ngauss:
-            # if you leave the defaults, or enter something that can be
-            # multiplied by 3 to get
-            # to the right number of gaussians, it will just replicate
-            if len(parlist) == 3:
-                parlist *= ngauss
-            elif parlist == params:
-                parlist[:] = [1, 0, 1] * ngauss
-            elif parlist == fixed or parlist == limitedmax:
-                parlist[:] = [False, False, False] * ngauss
-            elif parlist == limitedmin:
-                parlist[:] = [False, False, True] * ngauss
-            elif parlist == minpars or parlist == maxpars:
-                parlist[:] = [0, 0, 0] * ngauss
-
-    def mpfitfun(x, y, err):
-        if err is None:
-            def f(p, fjac=None): return [0, (y - n_gaussian(pars=p)(x))]
-        else:
-            def f(p, fjac=None): return [0, (y - n_gaussian(pars=p)(x)) / err]
-        return f
-
-    if xax is None:
-        xax = np.arange(len(data))
-
-    parnames = {0: "AMPLITUDE", 1: "SHIFT", 2: "WIDTH"}
-
-    parinfo = [{'n': ii, 'value': params[ii],
-                'limits': [minpars[ii], maxpars[ii]],
-                'limited': [limitedmin[ii], limitedmax[ii]],
-                'fixed': fixed[ii],
-                'parname': parnames[ii % 3] + str(ii % 3), 'error': ii}
-               for ii in range(len(params))]
-
-    if veryverbose:
-        print("GUESSES: ")
-        print("\n".join(["%s: %s" % (p['parname'], p['value'])
-                         for p in parinfo]))
-
-    mp = mpfit(mpfitfun(xax, data, err), parinfo=parinfo, quiet=quiet)
-    mpp = mp.params
-    mpperr = mp.perror
-    chi2 = mp.fnorm
-
-    if mp.status == 0:
-        raise Exception(mp.errmsg)
-
-    if not shh:
-        print("Final fit values: ")
-        for i, p in enumerate(mpp):
-            parinfo[i]['value'] = p
-            print(parinfo[i]['parname'], p, " +/- ", mpperr[i])
-        print(
-            "Chi2: ",
-            mp.fnorm,
-            " Reduced Chi2: ",
-            mp.fnorm /
-            len(data),
-            " DOF:",
-            len(data) -
-            len(mpp))
-
-    return mpp, n_gaussian(pars=mpp)(xax), mpperr, chi2
 
 
 def compute_feature_uncertainty(gposition, gsigma, wave_feat, rms):
@@ -786,7 +532,7 @@ def params_6gauss(basename, guess):
         'IRAS05063_CWsub': p3,              # GOOD
         'IRAS05092_CWsub': p0,              # GOOD
         'IRAS05186_CWsub': p0,              # GOOD
-        'IRAS05361_CWsub': p0,              # GOOD
+        'IRAS05361_CWsub': p0,              # GOOD -- TRY RESTRICTING 7.6 GASUSS FROM LEFT?
         'IRAS05370_CWsub': p4,              # GOOD, don't trust 7.2
         'IRAS05413_CWsub': p2,              # GOOD ENOUGH I GUESS? ONLY TRUST 6.9, maybe 77 flux
         'IRAS05588_CWsub': p0,              # GOOD
@@ -1764,7 +1510,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         ax1.axvline(x=centroid77, color='k', ls='-', lw=0.5)
         ax1.axhline(y=0, ls='--', lw=0.5, color='k')
         ax1.axvline(x=6.9, color='k', ls='-', lw=0.5)
-        ax1.axvline(x=7.25, color='k', ls='-', lw=0.5)      
+        ax1.axvline(x=7.25, color='k', ls='-', lw=0.5)
         ax1.legend(loc=0, fontsize=8)
         xmin, xmax = ax1.get_xlim()
 
