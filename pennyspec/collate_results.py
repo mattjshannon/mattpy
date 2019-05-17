@@ -9,8 +9,6 @@ import glob
 import numpy as np
 import pickle
 
-from ipdb import set_trace as st
-
 # Load data:
 PICKLE_DIR = 'output_table2/numeric/'
 OUTPUT_DIR = 'output_table2/numeric/'

@@ -15,27 +15,26 @@ def find_nearest(array,value,forcefloor=0):
     if forcefloor==1:
         if array[idx] > value:
             idx -= 1
-    return idx    
-    
+    return idx
+
 def smooth(x,window_len=50,window='hanning'):
-        if x.ndim != 1:
-                raise ValueError("smooth only accepts 1 dimension arrays.")
-        if x.size < window_len:
-                raise ValueError("Input vector needs to be bigger than window size.")
-        if window_len<3:
-                return x
-        if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-                raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
-        s=np.r_[2*x[0]-x[window_len-1::-1],x,2*x[-1]-x[-1:-window_len:-1]]
-        if window == 'flat': #moving average
-                w=np.ones(window_len,'d')
-        else:  
-                w=eval('np.'+window+'(window_len)')
-        y=np.convolve(w/w.sum(),s,mode='same')
-        return y[window_len:-window_len+1]
-    
+    if x.ndim != 1:
+            raise ValueError("smooth only accepts 1 dimension arrays.")
+    if x.size < window_len:
+            raise ValueError("Input vector needs to be bigger than window size.")
+    if window_len<3:
+            return x
+    if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
+            raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
+    s=np.r_[2*x[0]-x[window_len-1::-1],x,2*x[-1]-x[-1:-window_len:-1]]
+    if window == 'flat': #moving average
+            w=np.ones(window_len,'d')
+    else:
+            w=eval('np.'+window+'(window_len)')
+    y=np.convolve(w/w.sum(),s,mode='same')
+    return y[window_len:-window_len+1]
+
 def continuumPoints(start):
-    
     if start > 6.:
         waveKnots = [7.6,8.25,9.15,9.9,
                     10.35,10.9,11.75,12.23,13.10,13.8]
@@ -45,18 +44,18 @@ def continuumPoints(start):
         #             11.70,12.20,13.04,13.57,13.93]#,14.5]
         waveKnots = [2.90,3.90,4.6,5.49,5.8,6.00,6.54,6.75,7.15,9.3,10,
                     10.8,
-                    11.70,12.20,13.04,13.57,13.93]#,14.5]        
+                    11.70,12.20,13.04,13.57,13.93]#,14.5]
         # waveKnots = [5.25,5.49,5.71,6.04,6.54,6.70,9.35,9.88,
         #             10.27,10.47,11.63,12.20,13.0]#,14.5]
 
     return waveKnots
-    
+
 def getWindowSize():
     return 0.1
-    
+
 def getWindowLen():
     return 11
-    
+
 def continuumFluxes(waveKnots, wave, flux, dosmooth=0, findmin=0):
 
     holdWave = []
@@ -77,13 +76,13 @@ def continuumFluxes(waveKnots, wave, flux, dosmooth=0, findmin=0):
             holdWave.append(minWave)
             holdFlux.append(minFlux)
         return holdWave, holdFlux
-        
+
     else:
         fluxKnots = [flux[find_nearest(wave, x)] for x in waveKnots]
         return waveKnots, fluxKnots
-        
-def fitContinuum(wave, flux, dosmooth=0):    
-    
+
+def fitContinuum(wave, flux, dosmooth=0):
+
     # Retreive continuum points
     waveKnots = continuumPoints(wave[0])
 
@@ -128,7 +127,7 @@ dataDir = ''
 
     #print i, fname
 
-    # Read data    
+    # Read data
 data = np.loadtxt(dataDir+'iras17047.txt', delimiter=',').T
 wave, flux, fluxerr = data[0], data[1], data[2]
 
@@ -146,14 +145,14 @@ splineWaveSmoo, splineFluxSmoo, waveKnotsSmoo, fluxKnotsSmoo = fitContinuum(wave
 # st()
 
 
-        
-    
+
+
 wavelim=np.where(wave<=13.9)
 # Plot fit
 fig, ax = plt.subplots()
 ax.errorbar(wave[wavelim], flux[wavelim], fluxerr[wavelim], color='r', ecolor='0.45', label='Data', lw=2, elinewidth=1)
 ax.plot(wave[wavelim], flux[wavelim], color='r', label='Data', lw=2)
-    
+
 ax.plot(splineWave[wavelim], splineFlux[wavelim], 'g-', label='Spline fit', lw=2, zorder=1000)
 ax.plot(waveKnots, fluxKnots, 'ko', ms=4, zorder=1000)
 # ax.plot(splineWaveSmoo[wavelim], splineFluxSmoo[wavelim], 'b-', label='Spline fit', lw=2)
@@ -209,7 +208,7 @@ wavelim2 = np.where((wave>=5)&(wave<=10))
 fig2, ax = plt.subplots()
 ax.errorbar(wave[wavelim2], flux[wavelim2], fluxerr[wavelim2], color='r', ecolor='0.45', label='Data', lw=2, elinewidth=1)
 ax.plot(wave[wavelim2], flux[wavelim2], color='r', label='Data', lw=2)
-    
+
 ax.plot(splineWave, splineFlux, 'g-', label='Spline fit', lw=2, zorder=1000)
 # ax.plot(splineWave[wavelim2], splineFlux[wavelim2], 'g-', label='Spline fit', lw=2)
 ax.plot(waveKnots, fluxKnots, 'ko', ms=4, zorder=1000)

@@ -22,7 +22,7 @@ Notes:
 import glob
 import numpy as np
 
-from scripts.spectrum import Spectrum
+# from scripts.spectrum import Spectrum
 from scripts.spectrum_full import FullSpectrum
 
 # Load data:
