@@ -7,12 +7,15 @@ Helpers functions for analyze_pahs.py
 
 import errno
 import os
+import pickle
+
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
+from gaussfitter import onedgaussian, multigaussfit
 from scipy.integrate import simps
 
-from scripts.mpfit import mpfit
+from mattpy.utils import to_sigma, to_fwhm, quant_str
 
 
 def ensure_exists(path):
@@ -56,261 +59,6 @@ def smooth(x, window_len=50, window='hanning'):
     return y[window_len:-window_len + 1]
 
 
-def onedgaussian(x, H, A, dx, w):
-    """
-    Returns a 1-dimensional gaussian of form
-    H+A*np.exp(-(x-dx)**2/(2*w**2))
-    """
-    return H + A * np.exp(-(x - dx)**2 / (2 * w**2))
-
-
-def onedgaussfit(xax, data, err=None,
-                 params=[0, 1, 0, 1], fixed=[False, False, False, False],
-                 limitedmin=[False, False, False, True],
-                 limitedmax=[False, False, False, False],
-                 minpars=[0, 0, 0, 0], maxpars=[0, 0, 0, 0],
-                 quiet=True, shh=True, veryverbose=False,
-                 vheight=True, negamp=False, usemoments=False):
-    """
-    Parameters
-    ----------
-    xax : np.array
-        x axis
-    data : np.array
-        y axis
-    err : np.array
-        error corresponding to data
-    params : tuple
-        Fit parameters: Height of background, Amplitude, Shift, Width
-    fixed : bool
-        Is parameter fixed?
-    limitedmin/minpars : tuple
-        set lower limits on each parameter (default: width>0)
-    limitedmax/maxpars : tuple
-        set upper limits on each parameter
-    quiet : bool
-        should MPFIT output each iteration?
-    shh : bool
-        output final parameters?
-    usemoments : bool
-        replace default parameters with moments
-    Returns
-    -------
-    Fit parameters
-    Model
-    Fit errors
-    chi2
-    """
-
-    def mpfitfun(x, y, err):
-        if err is None:
-            def f(p, fjac=None): return [0, (y - onedgaussian(x, *p))]
-        else:
-            def f(p, fjac=None): return [0, (y - onedgaussian(x, *p)) / err]
-        return f
-
-    if xax is None:
-        xax = np.arange(len(data))
-
-    if not vheight:
-        # height = params[0]
-        fixed[0] = True
-    # if usemoments:
-    #     params = onedmoments(
-    #         xax,
-    #         data,
-    #         vheight=vheight,
-    #         negamp=negamp,
-    #         veryverbose=veryverbose)
-    #     if vheight is False:
-    #         params = [height] + params
-    #     if veryverbose:
-    #         print("OneD moments: h: %g  a: %g  c: %g  w: %g" % tuple(params))
-
-    parinfo = [{'n': 0, 'value': params[0], 'limits': [minpars[0], maxpars[0]],
-                'limited': [limitedmin[0], limitedmax[0]], 'fixed': fixed[0],
-                'parname': "HEIGHT", 'error': 0},
-               {'n': 1, 'value': params[1], 'limits': [minpars[1], maxpars[1]],
-                'limited': [limitedmin[1], limitedmax[1]], 'fixed': fixed[1],
-                'parname': "AMPLITUDE", 'error': 0},
-               {'n': 2, 'value': params[2], 'limits': [minpars[2], maxpars[2]],
-                'limited': [limitedmin[2], limitedmax[2]], 'fixed': fixed[2],
-                'parname': "SHIFT", 'error': 0},
-               {'n': 3, 'value': params[3], 'limits': [minpars[3], maxpars[3]],
-                'limited': [limitedmin[3], limitedmax[3]], 'fixed': fixed[3],
-                'parname': "WIDTH", 'error': 0}]
-
-    mp = mpfit(mpfitfun(xax, data, err), parinfo=parinfo, quiet=quiet)
-    mpp = mp.params
-    mpperr = mp.perror
-    chi2 = mp.fnorm
-
-    if mp.status == 0:
-        raise Exception(mp.errmsg)
-
-    if (not shh) or veryverbose:
-        print("Fit status: ", mp.status)
-        for i, p in enumerate(mpp):
-            parinfo[i]['value'] = p
-            print(parinfo[i]['parname'], p, " +/- ", mpperr[i])
-        print(
-            "Chi2: ",
-            mp.fnorm,
-            " Reduced Chi2: ",
-            mp.fnorm /
-            len(data),
-            " DOF:",
-            len(data) -
-            len(mpp))
-
-    return mpp, onedgaussian(xax, *mpp), mpperr, chi2
-
-
-def n_gaussian(pars=None, a=None, dx=None, sigma=None):
-    """
-    Returns a function that sums over N gaussians, where N is the length of
-    a,dx,sigma *OR* N = len(pars) / 3
-    The background "height" is assumed to be zero (you must "baseline" your
-    spectrum before fitting)
-    pars  - a list with len(pars) = 3n, assuming a,dx,sigma repeated
-    dx    - offset (velocity center) values
-    sigma - line widths
-    a     - amplitudes
-    """
-    if len(pars) % 3 == 0:
-        a = [pars[ii] for ii in range(0, len(pars), 3)]
-        dx = [pars[ii] for ii in range(1, len(pars), 3)]
-        sigma = [pars[ii] for ii in range(2, len(pars), 3)]
-    elif not(len(dx) == len(sigma) == len(a)):
-        raise ValueError("Wrong array lengths! dx: %i  sigma: %i  a: %i" %
-                         (len(dx), len(sigma), len(a)))
-
-    def g(x):
-        v = np.zeros(len(x))
-        for i in range(len(dx)):
-            v += a[i] * np.exp(-(x - dx[i])**2 / (2.0 * sigma[i]**2))
-        return v
-    return g
-
-
-def multigaussfit(xax, data, ngauss=1, err=None, params=[1, 0, 1],
-                  fixed=[False, False, False], limitedmin=[False, False, True],
-                  limitedmax=[False, False, False], minpars=[0, 0, 0],
-                  maxpars=[0, 0, 0],
-                  quiet=True, shh=True, veryverbose=False):
-    """
-    An improvement on onedgaussfit.  Lets you fit multiple gaussians.
-    Parameters
-    ----------
-    xax : np.array
-      x axis
-    data : np.array
-      y axis
-    err : np.array or None
-      error corresponding to data
-    ngauss : int
-      How many gaussians to fit?  Default 1 (this could supersede
-      onedgaussfit). Parameters below need to have lenght of 3*ngauss. If
-      ``ngauss``>1 and their lenght is 3, they will be replicated ngaus
-      times, otherwise they will be reset to defaults.
-    params : list
-      Fit parameters: [amplitude, offset, width] * ngauss
-      If len(params) % 3 == 0, ngauss will be set to len(params) / 3
-    fixed : list of bools
-      Is parameter fixed?
-    limitedmin/minpars : list
-      set lower limits on each parameter (default: width>0)
-    limitedmax/maxpars : list
-      set upper limits on each parameter
-    minpars : list
-    maxpars : list
-    quiet : bool
-      should MPFIT output each iteration?
-    shh : bool
-      output final parameters?
-    veryverbose : bool
-    Returns
-    -------
-    Fit parameters
-    Model
-    Fit errors
-    chi2
-    """
-
-    if len(params) != ngauss and (len(params) // 3) > ngauss:
-        ngauss = len(params) // 3
-
-    if isinstance(params, np.ndarray):
-        params = params.tolist()
-
-    # make sure all various things are the right length; if they're not, fix
-    # them using the defaults
-    for parlist in (params, fixed, limitedmin, limitedmax, minpars, maxpars):
-        if len(parlist) != 3 * ngauss:
-            # if you leave the defaults, or enter something that can be
-            # multiplied by 3 to get
-            # to the right number of gaussians, it will just replicate
-            if len(parlist) == 3:
-                parlist *= ngauss
-            elif parlist == params:
-                parlist[:] = [1, 0, 1] * ngauss
-            elif parlist == fixed or parlist == limitedmax:
-                parlist[:] = [False, False, False] * ngauss
-            elif parlist == limitedmin:
-                parlist[:] = [False, False, True] * ngauss
-            elif parlist == minpars or parlist == maxpars:
-                parlist[:] = [0, 0, 0] * ngauss
-
-    def mpfitfun(x, y, err):
-        if err is None:
-            def f(p, fjac=None): return [0, (y - n_gaussian(pars=p)(x))]
-        else:
-            def f(p, fjac=None): return [0, (y - n_gaussian(pars=p)(x)) / err]
-        return f
-
-    if xax is None:
-        xax = np.arange(len(data))
-
-    parnames = {0: "AMPLITUDE", 1: "SHIFT", 2: "WIDTH"}
-
-    parinfo = [{'n': ii, 'value': params[ii],
-                'limits': [minpars[ii], maxpars[ii]],
-                'limited': [limitedmin[ii], limitedmax[ii]],
-                'fixed': fixed[ii],
-                'parname': parnames[ii % 3] + str(ii % 3), 'error': ii}
-               for ii in range(len(params))]
-
-    if veryverbose:
-        print("GUESSES: ")
-        print("\n".join(["%s: %s" % (p['parname'], p['value'])
-                         for p in parinfo]))
-
-    mp = mpfit(mpfitfun(xax, data, err), parinfo=parinfo, quiet=quiet)
-    mpp = mp.params
-    mpperr = mp.perror
-    chi2 = mp.fnorm
-
-    if mp.status == 0:
-        raise Exception(mp.errmsg)
-
-    if not shh:
-        print("Final fit values: ")
-        for i, p in enumerate(mpp):
-            parinfo[i]['value'] = p
-            print(parinfo[i]['parname'], p, " +/- ", mpperr[i])
-        print(
-            "Chi2: ",
-            mp.fnorm,
-            " Reduced Chi2: ",
-            mp.fnorm /
-            len(data),
-            " DOF:",
-            len(data) -
-            len(mpp))
-
-    return mpp, n_gaussian(pars=mpp)(xax), mpperr, chi2
-
-
 def compute_feature_uncertainty(gposition, gsigma, wave_feat, rms):
 
     myrange = [gposition - (3. * gsigma), gposition + (3. * gsigma)]
@@ -320,6 +68,508 @@ def compute_feature_uncertainty(gposition, gsigma, wave_feat, rms):
     feature_uncertainty = (rms * np.sqrt(N) * dl * 2)
 
     return feature_uncertainty
+
+
+def params_6gauss(basename, guess):
+
+    p0 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 4.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                0,           7.15,  to_sigma(0.05),
+                0,           7.45,  to_sigma(0.315),
+                0,           7.77,  to_sigma(0.275),
+                0,           8.15,  to_sigma(0.165),
+                0,           8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p1 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 4.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                guess / 40., 7.15,  to_sigma(0.05),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                0,           8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p2 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                0., 7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                0.,          7.15,  to_sigma(0.05),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                0.,          8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p3 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 4., 7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                guess / 30., 7.15,  to_sigma(0.05),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                guess / 30., 8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p4 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 6.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                guess / 30., 7.15,  to_sigma(0.05),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                0.,          8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p5 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                1.21852599e-15 * 0.1,  7.25, to_sigma(0.1),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                0., 7.15,  to_sigma(0.05),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                0.,          8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                1.21852599e-15 * 0.25, 7.35, to_sigma(0.13),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p6 = {
+        'params':
+            [
+                guess / 2.,  6.93, to_sigma(0.15),
+                guess / 6.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.40),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.91,  to_sigma(0.06),
+                0., 7.15,  to_sigma(0.05),
+                guess / 30., 7.53,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                0.,          8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.16),
+                guess, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.41),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p7 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 6.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                guess / 30., 7.15,  to_sigma(0.05),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                0.,          8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p8 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 6.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.60, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                guess / 30., 7.15,  to_sigma(0.05),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                guess / 30., 8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p9 = {
+        'minpars':
+            [
+                guess / 30., 6.82, to_sigma(0.06),
+                0.,          7.15, to_sigma(0.05),
+                guess / 30., 7.45, to_sigma(0.315),
+                guess / 30., 7.77, to_sigma(0.275),
+                0.,          8.15, to_sigma(0.165),
+                guess / 30., 8.49, to_sigma(0.235),
+            ],
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 6.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'maxpars':
+            [
+                guess,       6.96, to_sigma(0.21),
+                guess,       7.35, to_sigma(0.15),
+                guess,       7.65, to_sigma(0.565),
+                guess,       7.97, to_sigma(0.525),
+                guess,       8.35, to_sigma(0.415),
+                guess,       8.69, to_sigma(0.485),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ]
+    }
+
+    p10 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 4.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [False] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                guess / 40., 7.22,  to_sigma(0.07),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                0,           8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.16),
+                guess, 7.32, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.6),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    param_dict = {
+        'hd97048_convCWsub': p0,         # GOOD, wouldn't trust 72 tho
+        'hd135344_convCWsub': p0,        # * NO ALIPHATICS TRUSTED!!! *
+        'IRAS05063_CWsub': p3,           # GOOD
+        'IRAS05092_CWsub': p0,           # GOOD
+        'IRAS05186_CWsub': p0,           # GOOD
+        'IRAS05361_CWsub': p0,           # GOOD. TRY LIMIT G7.6 FROM LEFT?
+        'IRAS05370_CWsub': p4,           # GOOD, don't trust 7.2
+        'IRAS05413_CWsub': p2,           # GOOD? ONLY TRUST 6.9, maybe 77 flux
+        'IRAS05588_CWsub': p0,           # GOOD
+        'IRAS06111_CWsub': p0,           # GOOD
+        'IRAS14429_CWsub': p0,           # GOOD
+        'IRAS15482_CWsub': p5,           # GOOD, don't trust 7.2 maybe (manual)
+        'iras17047_SWS_CWsub': p10,      # GOOD, had to do ct myself
+        'IRASF05110-6616_LR_CWsub': p0,  # GOOD
+        'IRASf05192_CWsub': p1,          # GOOD, quesitonable 69/72. tho
+        'J004441_CWsub': p0,             # GOOD
+        'J010546_CWsub': p6,             # GOOD, not perfect but good enough?
+        'j050713_CWsub': p7,             # GOOD
+        'J052043_CWsub': p8,             # GOOD, had to drop errors?
+        'J052520_CWsub': p1,             # GOOD
+        'NGC1978WBT2665_CWsub': p1,      # GOOD
+        'SMPLMC076_CWsub': p1,           # new
+        'SMPSMC006_CWsub': p9,           # GOOD, dropping fluxerr in fit (!!)
+        'SMPSMC011_CWsub': p1,           # GOOD
+    }
+
+    # TO DO: UNCERTAINTIES!!!
+
+    # pos, flux, sigma = line69_params[basename]
+    # amp = flux / (np.sqrt(2) * np.abs(sigma) * np.sqrt(np.pi))
+
+    # max_flux72 = 0.35 * flux
+    # amp_72_approx = max_flux72 / (np.sqrt(2) * np.abs(sigma)* np.sqrt(np.pi))
+
+    # p0['params'][0] = amp
+    # p0['params'][1] = pos
+    # p0['params'][2] = sigma
+
+    # p0['fixed'][0] = True
+    # p0['fixed'][1] = True
+    # p0['fixed'][2] = True
+
+    # p0['maxpars'][3] = amp_72_approx
+    # p0['params'][3] = amp_72_approx * 0.5
+
+    return param_dict[basename]
 
 
 def measure_112_RMS(wave, csub):
@@ -874,6 +1124,50 @@ def fit_aromatics(basename, wave, flux, fluxerr, rms, output_dir):
 def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
     """Fit Gaussians and straight line at the same time or something. Or maybe
     no straight line."""
+    def param_constraints_OK(p0, line, index):
+        # Test if any parameter hitting min/max of constrained range.
+
+        def nums_equal(num1, num2, acc=0.01):
+            """Returns True if numbers are equal within some accuracy."""
+            if np.abs(num1 - num2) < acc:
+                return False
+            else:
+                return True
+
+        # Line position.
+        pindex = index * 3 + 1
+        fixed_position = p0['fixed'][pindex]
+
+        if not fixed_position:
+            limited_min = p0['limitedmin'][pindex]
+            limited_max = p0['limitedmax'][pindex]
+            if limited_min:
+                if not nums_equal(p0['minpars'][pindex], line['position']):
+                    print('Hitting minimum line position.')
+                    return False
+            if limited_max:
+                if not nums_equal(p0['maxpars'][pindex], line['position']):
+                    print('Hitting maximum line position.')
+                    return False
+
+        # Line sigma.
+        pindex = index * 3 + 2
+        fixed_sigma = p0['fixed'][pindex]
+
+        if not fixed_sigma:
+            limited_min = p0['limitedmin'][pindex]
+            limited_max = p0['limitedmax'][pindex]
+            if limited_min:
+                if not nums_equal(p0['minpars'][pindex], line['sigma']):
+                    print('Hitting minimum line sigma.')
+                    return False
+            if limited_max:
+                if not nums_equal(p0['maxpars'][pindex], line['sigma']):
+                    print('Hitting maximum line sigma.')
+                    return False
+
+        return True
+
     def fit_4gauss_2lines(wave, flux, fluxerr, trim, trim_wide):
 
         # Multigauss fit. Intensity, center, sigma (or FWHM?).
@@ -943,39 +1237,32 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
 
         return g76, g78, g82, g86, line69, line72, model, yfit, yfit2, wpeak
 
-    def fit_6gauss(wave, flux, fluxerr, trim):
+    def fit_6gauss(wave, flux, fluxerr, trim, basename):
 
-        # Multigauss fit. Intensity, center, sigma (or FWHM?).
+        # Initial parameters and constraints.
         yscale = flux[trim]
         guess = np.nanmax(yscale)
+        p_init = params_6gauss(basename, guess)
+
+        # If fluxerr[trim] has zeroes, don't use errors for now?
+        if 0 in fluxerr[trim]:
+            errpass = None
+        else:
+            errpass = fluxerr[trim]
+
+        if basename in ['J052043_CWsub', 'SMPSMC006_CWsub']:
+            errpass = None
+
+        # Multigauss fit. Intensity, center, sigma (or FWHM?).
         yfit = multigaussfit(
-            wave[trim], flux[trim], ngauss=6, err=fluxerr[trim],
-            params=[
-                guess / 2.,  6.89, 0.10,
-                guess / 2.,  7.23, 0.05,
-                guess / 2.,  7.68, 0.10,
-                guess,       7.95, 0.06,
-                guess / 2.,  8.23, 0.15,
-                guess / 2.,  8.61, 0.08,
-            ],
-            limitedmin=[True] * 18,
-            limitedmax=[True] * 18,
-            minpars=[
-                0, 6.8, 0.04,
-                0, 7.0, 0,
-                0, 7.5, 0.05,
-                0, 7.75, 0.01,
-                0, 8.1, 0.03,
-                0, 8.5, 0,
-            ],
-            maxpars=[
-                guess, 7.0, 0.2,
-                guess, 7.30, 0.2,
-                guess, 7.9, 0.25,
-                guess, 8.2, 0.25,
-                guess, 8.5, 0.2,
-                guess, 8.7, 0.12,
-            ])
+            wave[trim], flux[trim], ngauss=6, err=errpass,
+            params=p_init['params'],
+            limitedmin=p_init['limitedmin'],
+            limitedmax=p_init['limitedmax'],
+            fixed=p_init['fixed'],
+            minpars=p_init['minpars'],
+            maxpars=p_init['maxpars']
+            )
 
         # Save results.
         features = ('line69', 'line72', 'g76', 'g78', 'g82', 'g86')
@@ -991,7 +1278,10 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
             results[features[i]]['integrated_flux'] = simps(
                 results[features[i]]['spectrum'], results[features[i]]['wave'])
 
-        return yfit, results
+        # if basename == 'IRAS15482_CWsub':
+        #     st()
+
+        return yfit, results, p_init
 
     print(basename)
 
@@ -1050,7 +1340,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         ax2.set_xlim(xmin, xmax)
 
         # Save.
-        savename = output_dir + basename + '_test.pdf'
+        savename = output_dir + 'fullspec/' + basename + '_test.pdf'
         fig.savefig(savename, bbox_inches='tight')
         print('Saved: ', savename)
         plt.close()
@@ -1062,7 +1352,11 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         trim = np.where((wave > 6.0) & (wave < 10))
 
         # Try 6-components.
-        yfit, results = fit_6gauss(wave, flux, fluxerr, trim)
+        yfit, results, p0 = fit_6gauss(wave, flux, fluxerr, trim, basename)
+
+        # # Try 6, with LMFIT!
+        # yfit2, results2, p02 = fit_6gauss_lmfit(wave, flux, fluxerr, trim)
+        # st()
 
         # Plot results.
         fig = plt.figure(figsize=(8, 6))
@@ -1070,48 +1364,85 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         ax1 = plt.subplot(gs[0])
         ax2 = plt.subplot(gs[1])
 
+        ##############################
         # Upper panel.
+        ##############################
+
         flux77 = sum([results[x]['integrated_flux']
                       for x in ('g76', 'g78', 'g82')])
         spec77 = results['g76']['spectrum'] + results['g78']['spectrum'] + \
             results['g82']['spectrum']
-        centroid77 = np.sum(spec77 * wave) / np.sum(spec77)
 
+        centroid77 = np.sum(spec77 * wave) / np.sum(spec77)
         model_label = \
             r'Model (g1-3: {:.2f} µm, {:.2e} W/m$^2$)'.format(centroid77,
                                                               flux77)
-        ax1.plot(wave[trim], flux[trim], label='Data')
-        ax1.plot(wave[trim], yfit[1], label=model_label)
+        ax1.errorbar(wave[trim], flux[trim], yerr=fluxerr[trim], label='Data')
+        # ax1.plot(wave[trim], flux[trim], label='Data')
+
+        ax1.plot(wave[trim], yfit[1], label=model_label, zorder=1000)
         for index, key in enumerate(results):
             ax1.fill_between(wave[trim], wave[trim] * 0,
                              results[key]['spectrum'][trim],
                              lw=0.5, alpha=0.3)
         ax1.axvline(x=centroid77, color='k', ls='-', lw=0.5)
         ax1.axhline(y=0, ls='--', lw=0.5, color='k')
+        ax1.axvline(x=6.9, color='k', ls='-', lw=0.5)
+        ax1.axvline(x=7.25, color='k', ls='-', lw=0.5)
         ax1.legend(loc=0, fontsize=8)
         xmin, xmax = ax1.get_xlim()
 
+        ##############################
         # Lower panel.
-        ax2.plot(wave[trim], flux[trim] - yfit[1], label='Residuals')
+        ##############################
+
+        f72_69 = results['line72']['integrated_flux'] / \
+            results['line69']['integrated_flux']
+
+        label = 'Residuals (7.2/6.9 = {}' \
+                ')'.format(quant_str(f72_69, precision="0.01"))
+        ax2.plot(wave[trim], flux[trim] - yfit[1],
+                 label=label)
         ax2.axvline(x=6.9, color='k', ls='-', lw=0.5)
         ax2.axvline(x=7.25, color='k', ls='-', lw=0.5)
+
+        param_OK_list = [True]
         for index, key in enumerate(results):
             line = results[key]
-            label = '{:.2f} µm, {:.2e} W/m^2, sigma={:.2f} µm'.format(
-                line['position'], line['integrated_flux'], line['sigma']
+            label = '{:.2f} µm, {:.2e} W/m^2, FWHM={:.2f} µm'.format(
+                line['position'], line['integrated_flux'],
+                to_fwhm(line['sigma'])
             )
+            param_OK_list.append(param_constraints_OK(p0, line, index))
             ax2.fill_between(wave[trim], wave[trim] * 0,
                              results[key]['spectrum'][trim],
                              lw=0.5, alpha=0.3, label=label)
-        ax1.axhline(y=0, ls='--', lw=0.5, color='k')
-        ax2.legend(loc=0, fontsize=8)
+        ax2.axhline(y=0, ls='--', lw=0.5, color='k')
+        mylegend = ax2.legend(loc=0, fontsize=8)
+
+        for index, text in enumerate(mylegend.get_texts()):
+            if not param_OK_list[index]:
+                text.set_color("red")
 
         # Save.
-        savename = output_dir + basename + '_6gauss.pdf'
+        savename = output_dir + 'fullspec/' + basename + '_6gauss.pdf'
         fig.savefig(savename, bbox_inches='tight')
         print('Saved: ', savename)
         plt.close()
         fig.clear()
+
+        # Insert the 7.7 results.
+        results['pah77'] = {
+            'flux': flux77,
+            'centroid': centroid77,
+        }
+
+        pkl_name = output_dir + 'numeric/' + basename + '.pkl'
+        # Record results to disk.
+        with open(pkl_name, 'wb') as file:
+            pickle.dump(results, file, protocol=pickle.HIGHEST_PROTOCOL)
+            print('Saved: ', pkl_name)
+
     return
 
 

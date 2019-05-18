@@ -21,8 +21,13 @@ script:
   - coverage run -m pytest  # Run the tests and check for test coverage.
   - coverage report -m  # Generate test coverage report.
   - codecov  # Upload the report to codecov.
-  - flake8 --exclude versioneer.py,docs/source/conf.py  # Enforce code style.
+  - flake8 --exclude versioneer.py,docs/source/conf.py,pennyspec/input_table2/*  # Enforce code style.
   - set -e
   - make -C docs html  # Build the documentation.
   - pip install doctr
   - doctr deploy --built-docs docs/build/html .  # Publish the documentation.
+
+# safelist
+branches:
+  only:
+  - master
