@@ -41,10 +41,11 @@ for index, filename in enumerate(FILE_LIST):
         line = data[key]
 
         if key == 'pah77':
-            results[key].append((line['centroid'], line['flux']))
+            results[key].append((line['centroid'], line['flux'], line['fluxerr']))
         else:
             results[key].append((line['position'],
                                  line['integrated_flux'],
+                                 line['integrated_fluxerr'],
                                  line['sigma']))
 
 # Combine results for all sources.
@@ -53,11 +54,11 @@ rr = np.column_stack((results['index'], results['basename'],
                       results['line72'], results['g76'], results['g78'],
                       results['g82'], results['g86']))
 
-header = 'index, basename, pah77 (position, flux), ' \
-         'aliphatic 6.9 (*3), aliphatic 7.2 (*3), ' \
-         'g76 (*3), g78 (*3), g82 (*3), g86 (*3)\n' \
-         'NOTE: (*3) means 3 columns: ' \
-         'position, integrated flux (in W/m^2), sigma.' \
+header = 'index, basename, pah77 (position, flux, fluxerr), ' \
+         'aliphatic 6.9 (*4), aliphatic 7.2 (*4), ' \
+         'g76 (*4), g78 (*4), g82 (*3), g86 (*4)\n' \
+         'NOTE: (*4) means 4 columns: ' \
+         'position, integrated flux (in W/m^2), integrated flux error, sigma.\n' \
          'NOTE: pah77 flux is sum of g76, g78 and g82.'
 
 # Save to disk.
