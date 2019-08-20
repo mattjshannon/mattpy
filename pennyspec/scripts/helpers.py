@@ -1267,19 +1267,24 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         # Save results.
         features = ('line69', 'line72', 'g76', 'g78', 'g82', 'g86')
         keys = ('scale_factor', 'position', 'sigma')
+        keys_err = ('scale_factor_err', 'position_err', 'sigma_err')
         results = {}
 
         for i in range(6):
-            fit_params = (yfit[0][3 * i:3 * i + 3])
+            fit_params = (yfit[0][3*i: 3*i+3])
+            fit_params_err = (yfit[2][3*i: 3*i+3])
+
+            integrated_fluxerr = compute_feature_uncertainty(
+                fit_params[1], fit_params[2], wave[trim], rms
+            )
             results[features[i]] = dict(zip(keys, fit_params))
+            results[features[i]].update(dict(zip(keys_err, fit_params_err)))
             results[features[i]]['wave'] = wave
             results[features[i]]['spectrum'] = onedgaussian(
                 wave, 0, *fit_params)
             results[features[i]]['integrated_flux'] = simps(
                 results[features[i]]['spectrum'], results[features[i]]['wave'])
-
-        # if basename == 'IRAS15482_CWsub':
-        #     st()
+            results[features[i]]['integrated_fluxerr'] = integrated_fluxerr
 
         return yfit, results, p_init
 
@@ -1370,13 +1375,15 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
 
         flux77 = sum([results[x]['integrated_flux']
                       for x in ('g76', 'g78', 'g82')])
+        flux77_err = sum([results[x]['integrated_fluxerr']
+                          for x in ('g76', 'g78', 'g82')])
         spec77 = results['g76']['spectrum'] + results['g78']['spectrum'] + \
             results['g82']['spectrum']
 
         centroid77 = np.sum(spec77 * wave) / np.sum(spec77)
         model_label = \
-            r'Model (g1-3: {:.2f} µm, {:.2e} W/m$^2$)'.format(centroid77,
-                                                              flux77)
+            r'Model (g1-3: {:.2f} µm, {:.2e} +- ' \
+            '{:.2e} W/m$^2$)'.format(centroid77, flux77, flux77_err)
         ax1.errorbar(wave[trim], flux[trim], yerr=fluxerr[trim], label='Data')
         # ax1.plot(wave[trim], flux[trim], label='Data')
 
@@ -1409,8 +1416,9 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         param_OK_list = [True]
         for index, key in enumerate(results):
             line = results[key]
-            label = '{:.2f} µm, {:.2e} W/m^2, FWHM={:.2f} µm'.format(
+            label = '{:.2f} µm, {:.2e} +- {:.2e} W/m^2, FWHM={:.2f} µm'.format(
                 line['position'], line['integrated_flux'],
+                line['integrated_fluxerr'],
                 to_fwhm(line['sigma'])
             )
             param_OK_list.append(param_constraints_OK(p0, line, index))
@@ -1434,6 +1442,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         # Insert the 7.7 results.
         results['pah77'] = {
             'flux': flux77,
+            'fluxerr': flux77_err,
             'centroid': centroid77,
         }
 
