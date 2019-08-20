@@ -2,8 +2,8 @@
 mattpy
 ===============================
 
-.. image:: https://img.shields.io/travis/mattjshannon/mattpy.svg
-        :target: https://travis-ci.org/mattjshannon/mattpy
+.. image:: https://travis-ci.org/mattjshannon/mattpy.svg?branch=master
+    :target: https://travis-ci.org/mattjshannon/mattpy
 
 
 Tools for astronomical analysis.
