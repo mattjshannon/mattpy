@@ -12,12 +12,10 @@ import pickle
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
-from ipdb import set_trace as st
 from gaussfitter import onedgaussian, multigaussfit
 from scipy.integrate import simps
 
 from mattpy.utils import to_sigma, to_fwhm, quant_str
-
 
 
 def ensure_exists(path):
@@ -1272,7 +1270,6 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         keys_err = ('scale_factor_err', 'position_err', 'sigma_err')
         results = {}
 
-
         for i in range(6):
             fit_params = (yfit[0][3*i: 3*i+3])
             fit_params_err = (yfit[2][3*i: 3*i+3])
@@ -1379,14 +1376,14 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         flux77 = sum([results[x]['integrated_flux']
                       for x in ('g76', 'g78', 'g82')])
         flux77_err = sum([results[x]['integrated_fluxerr']
-                      for x in ('g76', 'g78', 'g82')])
+                          for x in ('g76', 'g78', 'g82')])
         spec77 = results['g76']['spectrum'] + results['g78']['spectrum'] + \
             results['g82']['spectrum']
 
         centroid77 = np.sum(spec77 * wave) / np.sum(spec77)
         model_label = \
-            r'Model (g1-3: {:.2f} µm, {:.2e} +- {:.2e} W/m$^2$)'.format(centroid77,
-                                                              flux77, flux77_err)
+            r'Model (g1-3: {:.2f} µm, {:.2e} +- ' \
+            '{:.2e} W/m$^2$)'.format(centroid77, flux77, flux77_err)
         ax1.errorbar(wave[trim], flux[trim], yerr=fluxerr[trim], label='Data')
         # ax1.plot(wave[trim], flux[trim], label='Data')
 
