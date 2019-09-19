@@ -1,0 +1,4 @@
+Object name, flux (W/m^2), flux error (W/m^2)
+hd141569b_convCWsub
+4.2804676876097904e-15
+5.274314890555923e-16

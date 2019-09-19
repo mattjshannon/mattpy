@@ -1,0 +1,4 @@
+Object name, flux (W/m^2), flux error (W/m^2)
+hd44179_SWS_CWsub
+6.7867583292875925e-12
+2.5735306323349454e-13

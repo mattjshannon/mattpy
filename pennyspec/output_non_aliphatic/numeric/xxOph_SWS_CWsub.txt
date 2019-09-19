@@ -1,0 +1,4 @@
+Object name, flux (W/m^2), flux error (W/m^2)
+xxOph_SWS_CWsub
+1.0878198861264713e-13
+nan

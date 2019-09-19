@@ -46,4 +46,5 @@ class FullSpectrum:
         """Measure aliphatics and aromatics simultaneously."""
         wrap = (self.basename, self.wave, self.flux_si,
                 self.fluxerr_si, self.rms, output_dir)
-        helpers.fit_all(*wrap)
+        result = helpers.fit_all(*wrap)
+        return result
