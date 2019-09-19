@@ -523,9 +523,91 @@ def params_6gauss(basename, guess):
             ]
     }
 
+    p11 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 4.,  7.25, to_sigma(0.12),
+                guess / 100.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                0,           7.15,  to_sigma(0.05),
+                0,           7.45,  to_sigma(0.315),
+                0,           7.77,  to_sigma(0.275),
+                0,           8.15,  to_sigma(0.165),
+                0,           8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.35, to_sigma(0.15),
+                guess / 98., 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p12 = {
+        'params':
+            [
+                guess / 2.,  6.89, to_sigma(0.15),
+                guess / 4.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                guess / 30., 6.82,  to_sigma(0.06),
+                guess / 40., 7.15,  to_sigma(0.05),
+                guess / 30., 7.45,  to_sigma(0.315),
+                guess / 30., 7.77,  to_sigma(0.275),
+                0,           8.15,  to_sigma(0.165),
+                guess / 30., 8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess, 6.96, to_sigma(0.21),
+                guess, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
     param_dict = {
         'hd97048_convCWsub': p0,         # GOOD, wouldn't trust 72 tho
-        'hd135344_convCWsub': p0,        # * NO ALIPHATICS TRUSTED!!! *
+        'hd135344_convCWsub': p11,        # * NO ALIPHATICS TRUSTED!!! *
         'IRAS05063_CWsub': p3,           # GOOD
         'IRAS05092_CWsub': p0,           # GOOD
         'IRAS05186_CWsub': p0,           # GOOD
@@ -545,7 +627,7 @@ def params_6gauss(basename, guess):
         'J052043_CWsub': p8,             # GOOD, had to drop errors?
         'J052520_CWsub': p1,             # GOOD
         'NGC1978WBT2665_CWsub': p1,      # GOOD
-        'SMPLMC076_CWsub': p1,           # new
+        'SMPLMC076_CWsub': p12,           # new
         'SMPSMC006_CWsub': p9,           # GOOD, dropping fluxerr in fit (!!)
         'SMPSMC011_CWsub': p1,           # GOOD
     }
