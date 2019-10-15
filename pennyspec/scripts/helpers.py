@@ -746,8 +746,6 @@ def params_6gauss(basename, guess):
     # p0['params'][3] = amp_72_approx * 0.5
 
 
-
-
 def measure_112_RMS(wave, csub):
     xmin = 11.9
     xmax = 12.1
@@ -1300,6 +1298,16 @@ def fit_aromatics(basename, wave, flux, fluxerr, rms, output_dir):
 def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
     """Fit Gaussians and straight line at the same time or something. Or maybe
     no straight line."""
+    def pretty_title(basename):
+        titles = {
+            'IRAS06111_CWsub': 'IRAS 06111',
+        }
+
+        if basename in titles:
+            return titles[basename]
+        else:
+            return basename
+
     def param_constraints_OK(p0, line, index):
         # Test if any parameter hitting min/max of constrained range.
 
@@ -1530,7 +1538,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
     else:
 
         # Only fit 7-9 micron zone.
-        trim = np.where((wave > 6.0) & (wave < 10))
+        trim = np.where((wave > 6.5) & (wave < 9.5))
 
         # Try 6-components.
         yfit, results, p0 = fit_6gauss(wave, flux, fluxerr, trim, basename)
@@ -1540,8 +1548,9 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         # st()
 
         # Plot results.
-        fig = plt.figure(figsize=(8, 6))
-        gs = gridspec.GridSpec(ncols=1, nrows=2, figure=fig, hspace=0.3)
+        fig = plt.figure(figsize=(8, 4))
+        gs = gridspec.GridSpec(ncols=1, nrows=2, figure=fig, hspace=0.0,
+                               height_ratios=(5, 1))
         ax1 = plt.subplot(gs[0])
         ax2 = plt.subplot(gs[1])
 
@@ -1560,20 +1569,33 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         model_label = \
             r'Model (g1-3: {:.2f} µm, {:.2e} +- ' \
             '{:.2e} W/m$^2$)'.format(centroid77, flux77, flux77_err)
+
         ax1.errorbar(wave[trim], flux[trim], yerr=fluxerr[trim], label='Data')
         # ax1.plot(wave[trim], flux[trim], label='Data')
 
-        ax1.plot(wave[trim], yfit[1], label=model_label, zorder=1000)
+        ax1.plot(wave[trim], yfit[1], label='Model', zorder=1000)
+        # ax1.plot(wave[trim], yfit[1], label=model_label, zorder=1000)
+
         for index, key in enumerate(results):
             ax1.fill_between(wave[trim], wave[trim] * 0,
                              results[key]['spectrum'][trim],
                              lw=0.5, alpha=0.3)
-        ax1.axvline(x=centroid77, color='k', ls='-', lw=0.5)
-        ax1.axhline(y=0, ls='--', lw=0.5, color='k')
-        ax1.axvline(x=6.9, color='k', ls='-', lw=0.5)
-        ax1.axvline(x=7.25, color='k', ls='-', lw=0.5)
-        ax1.legend(loc=0, fontsize=8)
+
+
+        ax1.tick_params(reset=True, which='both', direction='in', left=True, labelbottom=False)
+        ax1.minorticks_on()
+        ax1.axvline(x=centroid77, color='k', ls='--', lw=0.5)
+        ax1.axhline(y=0, ls='--', lw=0.7, color='k')
+        ax1.axvline(x=6.9, color='k', ls='--', lw=0.5)
+        ax1.axvline(x=7.25, color='k', ls='--', lw=0.5)
+        ax1.legend(loc=0)
+
         xmin, xmax = ax1.get_xlim()
+        ymin, ymax = ax1.get_ylim()
+
+        ax1.set_ylabel(r'Flux density (W/m$^2$/µm)', labelpad=8)
+        ax1.set_title(pretty_title(basename), fontsize=11)
+
 
         ##############################
         # Lower panel.
@@ -1582,31 +1604,50 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         f72_69 = results['line72']['integrated_flux'] / \
             results['line69']['integrated_flux']
 
+        norm = int(str(ymax).split('e-')[-1])
+        norm_fac = 10**(-1 * norm)
+
         label = 'Residuals (7.2/6.9 = {}' \
                 ')'.format(quant_str(f72_69, precision="0.01"))
-        ax2.plot(wave[trim], flux[trim] - yfit[1],
-                 label=label)
-        ax2.axvline(x=6.9, color='k', ls='-', lw=0.5)
-        ax2.axvline(x=7.25, color='k', ls='-', lw=0.5)
 
-        param_OK_list = [True]
-        for index, key in enumerate(results):
-            line = results[key]
-            label = '{:.2f} µm, {:.2e} +- {:.2e} W/m^2, FWHM={:.2f} µm'.format(
-                line['position'], line['integrated_flux'],
-                line['integrated_fluxerr'],
-                to_fwhm(line['sigma'])
-            )
-            param_OK_list.append(param_constraints_OK(p0, line, index))
-            ax2.fill_between(wave[trim], wave[trim] * 0,
-                             results[key]['spectrum'][trim],
-                             lw=0.5, alpha=0.3, label=label)
-        ax2.axhline(y=0, ls='--', lw=0.5, color='k')
-        mylegend = ax2.legend(loc=0, fontsize=8)
+        ax2.axhline(y=0, ls='--', lw=0.7, color='k')
+        ax2.plot(wave[trim], (flux[trim] - yfit[1]) / norm_fac)
+        # ax2.axvline(x=6.9, color='k', ls='-', lw=0.5)
+        # ax2.axvline(x=7.25, color='k', ls='-', lw=0.5)
+        ax2.tick_params(reset=True, which='both', direction='in', left=True, labeltop=False)
+        ax2.minorticks_on()
+        ax2.set_xlabel('Wavelength (µm)', labelpad=8)
 
-        for index, text in enumerate(mylegend.get_texts()):
-            if not param_OK_list[index]:
-                text.set_color("red")
+        # ax2.set_ylim(ymax=ymax)
+
+        # from ipdb import set_trace as st
+
+        # test1 = ax1.get_yticks()
+        # test2 = ax2.get_yticks()
+
+        # sep1 = test1[1] - test1[0]
+        # ax2.set_yticks([0, sep1])
+        # ax2.set_yticks([0, 0.5])
+        # # st()
+
+        # param_OK_list = [True]
+        # for index, key in enumerate(results):
+        #     line = results[key]
+        #     label = '{:.2f} µm, {:.2e} +- {:.2e} W/m^2, FWHM={:.2f} µm'.format(
+        #         line['position'], line['integrated_flux'],
+        #         line['integrated_fluxerr'],
+        #         to_fwhm(line['sigma'])
+        #     )
+        #     param_OK_list.append(param_constraints_OK(p0, line, index))
+        #     ax2.fill_between(wave[trim], wave[trim] * 0,
+        #                      results[key]['spectrum'][trim],
+        #                      lw=0.5, alpha=0.3, label=label)
+        # ax2.axhline(y=0, ls='--', lw=0.5, color='k')
+        # mylegend = ax2.legend(loc=0, fontsize=8)
+
+        # for index, text in enumerate(mylegend.get_texts()):
+        #     if not param_OK_list[index]:
+        #         text.set_color("red")
 
         # Save.
         savename = output_dir + 'fullspec/' + basename + '_6gauss.pdf'

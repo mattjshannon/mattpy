@@ -1,0 +1,4 @@
+Object name, flux (W/m^2), flux error (W/m^2)
+SMPSMC006_CWsub
+7.458511304767293e-16
+4.894895790610547e-17

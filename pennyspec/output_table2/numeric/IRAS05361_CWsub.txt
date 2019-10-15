@@ -1,0 +1,4 @@
+Object name, flux (W/m^2), flux error (W/m^2)
+IRAS05361_CWsub
+4.8372544276986705e-15
+7.058187007342926e-17

@@ -1,0 +1,4 @@
+Object name, flux (W/m^2), flux error (W/m^2)
+NGC1978WBT2665_CWsub
+1.6751856956754818e-15
+4.9988105608729505e-17
