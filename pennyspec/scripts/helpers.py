@@ -72,6 +72,89 @@ def compute_feature_uncertainty(gposition, gsigma, wave_feat, rms):
 
 def params_6gauss(basename, guess):
 
+    p_non_aliphatics = {
+        'params':
+            [
+                guess / 200.,  6.89, to_sigma(0.15),
+                guess / 200.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                0.,          6.82,  to_sigma(0.06),
+                0,           7.15,  to_sigma(0.05),
+                0,           7.45,  to_sigma(0.315),
+                0,           7.77,  to_sigma(0.275),
+                0,           8.15,  to_sigma(0.165),
+                0,           8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess / 100., 6.96, to_sigma(0.21),
+                guess / 100, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+    p_non_aliphatics_xxoph = {
+        'params':
+            [
+                0.,  6.89, to_sigma(0.15),
+                0.,  7.25, to_sigma(0.12),
+                guess / 2.,  7.55, to_sigma(0.44),
+                guess / 1.,  7.87, to_sigma(0.40),
+                guess / 2.,  8.25, to_sigma(0.29),
+                guess / 2.,  8.59, to_sigma(0.36),
+            ],
+        'limitedmin': [True] * 18,
+        'limitedmax': [True] * 18,
+        'fixed':
+            [
+                True, False, False,
+                True, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+                False, False, False,
+            ],
+        'minpars':
+            [
+                0.,          6.82,  to_sigma(0.06),
+                0,           7.15,  to_sigma(0.05),
+                0,           7.45,  to_sigma(0.315),
+                0,           7.77,  to_sigma(0.275),
+                0,           8.15,  to_sigma(0.165),
+                0,           8.49,  to_sigma(0.235),
+            ],
+        'maxpars':
+            [
+                guess / 100., 6.96, to_sigma(0.21),
+                guess / 100, 7.35, to_sigma(0.15),
+                guess, 7.65, to_sigma(0.565),
+                guess, 7.97, to_sigma(0.525),
+                guess, 8.35, to_sigma(0.415),
+                guess, 8.69, to_sigma(0.485),
+            ]
+    }
+
+
     p0 = {
         'params':
             [
@@ -630,7 +713,18 @@ def params_6gauss(basename, guess):
         'SMPLMC076_CWsub': p12,           # new
         'SMPSMC006_CWsub': p9,           # GOOD, dropping fluxerr in fit (!!)
         'SMPSMC011_CWsub': p1,           # GOOD
+
+        'xxOph_SWS_CWsub': p_non_aliphatics_xxoph,
     }
+
+
+    if basename in param_dict:
+        print('In standard PARAM DICT.')
+        parameters = param_dict[basename]
+    else:
+        parameters = p_non_aliphatics
+
+    return parameters
 
     # TO DO: UNCERTAINTIES!!!
 
@@ -651,7 +745,7 @@ def params_6gauss(basename, guess):
     # p0['maxpars'][3] = amp_72_approx
     # p0['params'][3] = amp_72_approx * 0.5
 
-    return param_dict[basename]
+
 
 
 def measure_112_RMS(wave, csub):
@@ -1532,9 +1626,17 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         # Record results to disk.
         with open(pkl_name, 'wb') as file:
             pickle.dump(results, file, protocol=pickle.HIGHEST_PROTOCOL)
-            print('Saved: ', pkl_name)
+        print('Saved: ', pkl_name)
 
-    return
+        txt_name = output_dir + 'numeric/' + basename + '.txt'
+        with open(txt_name, 'w') as f:
+            f.write('Object name, flux (W/m^2), flux error (W/m^2)\n')
+            f.write(basename + '\n')
+            f.write(str(flux77) + '\n')
+            f.write(str(flux77_err) + '\n')
+        print('Saved: ', txt_name)
+
+    return (basename, flux77, flux77_err)
 
 
 def measure_112(basename, wave, flux, fluxerr, rms, output_dir,

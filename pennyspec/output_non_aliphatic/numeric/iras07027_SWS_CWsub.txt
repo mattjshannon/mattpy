@@ -1,0 +1,4 @@
+Object name, flux (W/m^2), flux error (W/m^2)
+iras07027_SWS_CWsub
+3.552266877332825e-13
+1.783038777494317e-14
