@@ -13,7 +13,9 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 from gaussfitter import onedgaussian, multigaussfit
+from matplotlib.ticker import FormatStrFormatter
 from scipy.integrate import simps
+
 
 from mattpy.utils import to_sigma, to_fwhm, quant_str
 
@@ -1301,11 +1303,36 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
     def pretty_title(basename):
         titles = {
             'IRAS06111_CWsub': 'IRAS 06111',
+            'IRAS05063_CWsub': 'IRAS 05063-6908',
+            'IRAS05092_CWsub': 'IRAS 05092-7121',
+            'IRAS05186_CWsub': 'IRAS 05185-6806',
+            'IRAS05361_CWsub': 'IRAS 05360-7121',
+            'IRAS05370_CWsub': 'IRAS 05370-7019',
+            'IRAS05413_CWsub': 'IRAS 05413-6934',
+            'IRAS05588_CWsub': 'IRAS 05588-6944',
+            'IRAS06111_CWsub': 'IRAS 06111-7023',
+            'IRAS14429_CWsub': 'IRAS 14429-4539',
+            'IRAS15482_CWsub': 'IRAS 15482-5741',
+            'IRASF05110-6616_LR_CWsub': 'IRAS f05110-6616',
+            'IRASf05192_CWsub': 'IRAS f05192-7008',
+            'J004441_CWsub': 'J00444111-7321361',
+            'J010546_CWsub': 'J01054645-7147053',
+            'J052043_CWsub': 'J05204385-6923403',
+            'J052520_CWsub': 'IRAS z05259-7052',
+            'NGC1978WBT2665_CWsub': 'NGC 1978 WBT2665',
+            'SMPLMC076_CWsub': 'SMP LMC 076',
+            'SMPSMC006_CWsub': 'SMP SMC 006',
+            'SMPSMC011_CWsub': 'SMP SMC 011',
+            'hd135344_convCWsub': 'HD 135344',
+            'hd97048_convCWsub': 'HD 97048',
+            'iras17047_SWS_CWsub': 'IRAS 17047-5650',
+            'j050713_CWsub': 'IRAS 05073-6752',
         }
 
         if basename in titles:
             return titles[basename]
         else:
+            print("cant identify basename: ", basename)
             return basename
 
     def param_constraints_OK(p0, line, index):
@@ -1581,7 +1608,6 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
                              results[key]['spectrum'][trim],
                              lw=0.5, alpha=0.3)
 
-
         ax1.tick_params(reset=True, which='both', direction='in', left=True, labelbottom=False)
         ax1.minorticks_on()
         ax1.axvline(x=centroid77, color='k', ls='--', lw=0.5)
@@ -1595,6 +1621,8 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
 
         ax1.set_ylabel(r'Flux density (W/m$^2$/µm)', labelpad=8)
         ax1.set_title(pretty_title(basename), fontsize=11)
+
+        # ax1.yaxis.set_major_formatter(FormatStrFormatter('%.2e'))
 
 
         ##############################
