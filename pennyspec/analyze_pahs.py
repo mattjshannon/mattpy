@@ -36,7 +36,7 @@ FILE_LIST = np.sort(glob.glob(DATA_DIR + '*CWsub.txt'))
 for index, filename in enumerate(FILE_LIST):
     print(index, filename)
 
-    if index not in [0]:
+    if index not in [7]:
         continue
 
     # spectrum = Spectrum(filename=filename, is_Windows=False)

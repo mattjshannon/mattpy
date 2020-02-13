@@ -1302,7 +1302,7 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
     no straight line."""
     def pretty_title(basename):
         titles = {
-            'IRAS06111_CWsub': 'IRAS 06111',
+            'IRAS06111_CWsub': 'IRAS 06111-7023',
             'IRAS05063_CWsub': 'IRAS 05063-6908',
             'IRAS05092_CWsub': 'IRAS 05092-7121',
             'IRAS05186_CWsub': 'IRAS 05185-6806',
@@ -1608,19 +1608,19 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
                              results[key]['spectrum'][trim],
                              lw=0.5, alpha=0.3)
 
-        ax1.tick_params(reset=True, which='both', direction='in', left=True, labelbottom=False)
+        ax1.tick_params(reset=True, which='both', direction='in', left=True, labelbottom=False, labelsize=11)
         ax1.minorticks_on()
         ax1.axvline(x=centroid77, color='k', ls='--', lw=0.5)
         ax1.axhline(y=0, ls='--', lw=0.7, color='k')
         ax1.axvline(x=6.9, color='k', ls='--', lw=0.5)
         ax1.axvline(x=7.25, color='k', ls='--', lw=0.5)
-        ax1.legend(loc=0)
+        ax1.legend(loc=0, fontsize=12)
 
         xmin, xmax = ax1.get_xlim()
         ymin, ymax = ax1.get_ylim()
 
-        ax1.set_ylabel(r'Flux density (W/m$^2$/µm)', labelpad=8)
-        ax1.set_title(pretty_title(basename), fontsize=11)
+        ax1.set_ylabel(r'Flux density (W/m$^2$/µm)', labelpad=8, fontsize=15)
+        ax1.set_title(pretty_title(basename), fontsize=18)
 
         # ax1.yaxis.set_major_formatter(FormatStrFormatter('%.2e'))
 
@@ -1642,9 +1642,9 @@ def fit_all(basename, wave, flux, fluxerr, rms, output_dir):
         ax2.plot(wave[trim], (flux[trim] - yfit[1]) / norm_fac)
         # ax2.axvline(x=6.9, color='k', ls='-', lw=0.5)
         # ax2.axvline(x=7.25, color='k', ls='-', lw=0.5)
-        ax2.tick_params(reset=True, which='both', direction='in', left=True, labeltop=False)
+        ax2.tick_params(reset=True, which='both', direction='in', left=True, labeltop=False, labelsize=11)
         ax2.minorticks_on()
-        ax2.set_xlabel('Wavelength (µm)', labelpad=8)
+        ax2.set_xlabel('Wavelength (µm)', labelpad=8, fontsize=15)
 
         # ax2.set_ylim(ymax=ymax)
 
